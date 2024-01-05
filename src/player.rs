@@ -12,7 +12,10 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component)]
-pub struct Player;
+pub struct Player {
+    mirrored: bool,
+    walking: bool,
+}
 
 #[derive(Component)]
 struct AnimationIndices {
@@ -29,6 +32,7 @@ fn animate_sprite(
         &AnimationIndices,
         &mut AnimationTimer,
         &mut TextureAtlasSprite,
+        &Player,
     )>,
 ) {
     //trace!("very noisy");
@@ -36,15 +40,22 @@ fn animate_sprite(
     //info!("helpful information that is worth printing by default");
     //warn!("something bad happened that isn't a failure, but thats worth calling out");
     //error!("something failed");
-    for (indices, mut timer, mut sprite) in &mut query {
+    for (indices, mut timer, mut sprite, player) in &mut query {
         timer.tick(time.delta());
-        if timer.just_finished() {
-            sprite.index = if sprite.index == indices.last {
-                indices.first
-            } else {
-                sprite.index + 1
-            };
+        if player.walking {
+            if sprite.index < indices.first { sprite.index = indices.first } // immediately switch to walk anim when starting walking
+            if timer.just_finished() {
+                sprite.index = if sprite.index == indices.last {
+                    indices.first
+                } else {
+                    sprite.index + 1
+                };
+            } 
+        } else {
+            sprite.index = indices.first - 1; // sprite sheet contains standing frame before walking frames
+            timer.reset();
         }
+        sprite.flip_x = player.mirrored;
     }
 }
 
@@ -77,7 +88,7 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player,
+        Player { mirrored: false, walking: false },
         Name::new("Player"),
         
     )).id();
@@ -88,30 +99,32 @@ fn setup(
 
 fn keyboard_events(
     // mut key_evr: EventReader<KeyboardInput>,
-    mut players: Query<(&AnimationTimer, &mut Transform)>,
+    mut players: Query<(&mut Player, &mut Transform)>,
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
     let speed: f32 = 1.0;
+    
+    let (mut player, mut transform) = players.iter_mut().next().expect("No player found");
+
+    player.walking = false;
     if input.pressed(KeyCode::W) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.y += speed * time.delta_seconds();
-        }
+        transform.translation.y += speed * time.delta_seconds();
+        player.walking = true;
     }
     if input.pressed(KeyCode::S) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.y -= speed * time.delta_seconds();
-        }
+        transform.translation.y -= speed * time.delta_seconds();
+        player.walking = true;
     }
     if input.pressed(KeyCode::A) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.x -= speed * time.delta_seconds();
-        }
+        transform.translation.x -= speed * time.delta_seconds();
+        player.mirrored = true;
+        player.walking = true;
     }
     if input.pressed(KeyCode::D) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.x += speed * time.delta_seconds();
-        }
+        transform.translation.x += speed * time.delta_seconds();
+        player.mirrored = false;
+        player.walking = true;
     }
 
     // use bevy::input::ButtonState;
