@@ -64,8 +64,27 @@ impl GameTile {
         use TileType::*;
         match self.tile_id {
              0| 1| 2| 5|10|11|14                   => Some(Water),
-             3| 4| 6| 7| 9| 8|15|16|17|18|21|26|30 => Some(Field),
+             3| 4| 6| 7| 8| 9|15|16|17|18|21|26|30 => Some(Field),
             19|20|22|23|24|25|31                   => Some(Mountain),
+            _                                      => None,
+        }
+    }
+    pub fn bottom_left_type(&self) -> Option<TileType> {
+        use TileType::*;
+        match self.tile_id {
+             0| 3| 4| 5| 7| 8|11                   => Some(Water),
+             1| 2| 6| 9|10|14|15|16|19|20|21|23|24 => Some(Field),
+            17|18|22|25|26|30|31                   => Some(Mountain),
+            _                                      => None,
+        }
+    }
+    
+    pub fn bottom_right_type(&self) -> Option<TileType> {
+        use TileType::*;
+        match self.tile_id {
+             2| 3| 4| 5| 6|10|11                   => Some(Water),
+             0| 1| 2| 8| 9|14|15|18|19|20|21|22|26 => Some(Field),
+            16|17|23|24|25|30|31                   => Some(Mountain),
             _                                      => None,
         }
     }
