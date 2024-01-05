@@ -1,11 +1,13 @@
 use bevy::prelude::*;
+use bevy::input::keyboard::KeyboardInput;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
   fn build(&self,  app: &mut App) {
     app.add_systems(Startup, setup)
-       .add_systems(Update, animate_sprite);
+       .add_systems(Update, animate_sprite)
+       .add_systems(Update, keyboard_events);
   }
 }
 
@@ -29,11 +31,11 @@ fn animate_sprite(
         &mut TextureAtlasSprite,
     )>,
 ) {
-    trace!("very noisy");
-    debug!("helpful for debugging");
-    info!("helpful information that is worth printing by default");
-    warn!("something bad happened that isn't a failure, but thats worth calling out");
-    error!("something failed");
+    //trace!("very noisy");
+    //debug!("helpful for debugging");
+    //info!("helpful information that is worth printing by default");
+    //warn!("something bad happened that isn't a failure, but thats worth calling out");
+    //error!("something failed");
     for (indices, mut timer, mut sprite) in &mut query {
         timer.tick(time.delta());
         if timer.just_finished() {
@@ -68,4 +70,22 @@ fn setup(
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
     ));
+}
+
+
+fn keyboard_events(
+    mut key_evr: EventReader<KeyboardInput>,
+) {
+    use bevy::input::ButtonState;
+
+    for ev in key_evr.iter() {
+        match ev.state {
+            ButtonState::Pressed => {
+                error!("Key press: {:?} ({})", ev.key_code, ev.scan_code);
+            }
+            ButtonState::Released => {
+                error!("Key release: {:?} ({})", ev.key_code, ev.scan_code);
+            }
+        }
+    }
 }
