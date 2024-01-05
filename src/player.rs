@@ -1,25 +1,16 @@
-//! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
-//! into a texture atlas, and changing the displayed image periodically.
-mod player;
-
-
 use bevy::prelude::*;
-use crate::player::PlayerPlugin;
-use crate::tile_world::TileWorldPlugin;
 
-mod tile_world;
-mod multi_vec;
+pub struct PlayerPlugin;
 
-fn main() {
-    
-    App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
-        .add_plugins(PlayerPlugin)
-        .add_plugins(TileWorldPlugin)
-        .add_systems(Startup, setup)
-        .add_systems(Update, animate_sprite)
-        .run();
+impl Plugin for PlayerPlugin {
+  fn build(&self,  app: &mut App) {
+    app.add_systems(Startup, setup)
+       .add_systems(Update, animate_sprite);
+  }
 }
+
+#[derive(Component)]
+struct Player ();
 
 #[derive(Component)]
 struct AnimationIndices {
