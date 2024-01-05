@@ -10,6 +10,7 @@ pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(JsonAssetPlugin::<PyxelFile>::new(&["json"])); // register .json extension (example advises for *."map.json")
+        app.add_systems(PreStartup, pre_setup);
         app.add_systems(Startup, setup);
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
@@ -26,7 +27,7 @@ struct PyxelFile {
 
 #[derive(Deserialize)]
 struct PyxelLayer {
-    name: String,
+    // name: String,
     number: i32,
     tiles: Vec<PyxelTile>,
 }
@@ -36,19 +37,37 @@ struct PyxelTile {
     x: i32,
     y: i32,
     tile: i32, // index of tile in tileset, or -1 for empty / custom tile
-    index: i32, // not sure, maybe y * width + x?
-    flipX: bool,
-    rot: i32, // 0, 1, 2, 3
+    // index: i32, // not sure, maybe y * width + x?
+    // #[serde(rename = "flipX")]
+    // flip_x: bool,
+    // rot: i32, // 0, 1, 2, 3
 }
 
+#[derive(Resource)]
+struct TileAssets {
+    pyxel_file: Handle<PyxelFile>,
+    tileset: Handle<Image>,
+}
 
+fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    let pyxel_handle: Handle<PyxelFile> = asset_server.load("tiles.json");
+    let tileset_handle: Handle<Image> = asset_server.load("tiles.png");
 
-pub fn setup(
+    commands.insert_resource(TileAssets {
+        pyxel_file: pyxel_handle,
+        tileset: tileset_handle,
+    });
+}
+
+fn setup(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     pyxel_file_assets: Res<Assets<PyxelFile>>,
+    tile_assets: Res<TileAssets>,
 ) {
+
+
     let pyxel_handle: Handle<PyxelFile> = asset_server.load("tiles.json");
     let pyxel_file = pyxel_file_assets.get(&pyxel_handle).unwrap();
 
@@ -87,7 +106,7 @@ pub fn setup(
     let texture_handle = asset_server.load("tiles.png");
     let texture_atlas = TextureAtlas::from_grid(
         texture_handle,
-        Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.y as f32),
+        Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.tileheight as f32),
         pyxel_file.tileswide as usize,
         pyxel_file.tileshigh as usize, None, None);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
