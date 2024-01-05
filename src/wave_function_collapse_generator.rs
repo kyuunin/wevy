@@ -1,9 +1,14 @@
-use bevy::utils::hashbrown::HashSet;
+use std::collections::HashMap;
+
+use enum_iterator::{Sequence, all};
 
 use crate::multi_vec::*;
 
+// all::<Direction>()
+#[derive(Sequence, PartialEq, Eq, Hash)]
 enum Direction
 {
+    None,
     Up,
     Left,
     Down,
@@ -18,6 +23,7 @@ impl From<Direction> for (i32, i32)
 {
     fn from(value: Direction) -> Self {
         match value {
+            Direction::None => (0, 0),
             Direction::Up => (0, -1),
             Direction::Left => (-1, 0),
             Direction::Down => (0, 1),
@@ -35,6 +41,53 @@ struct Pattern
     occurrences: usize,
     flat_definition: Vec<i32>,
     probability: f32,
+}
+
+struct RulesChecker
+{
+    rules: HashMap<usize, HashMap<Direction, Vec<usize>>>,
+    // fn add_rule(&mut self)
+}
+
+impl RulesChecker
+{
+    pub fn new(patterns: Vec<Pattern>) -> Self
+    {
+        let mut empty_rules = HashMap::<usize, HashMap<Direction, Vec<usize>>>::new();
+
+        for pattern_index in 0..patterns.len()
+        {
+            empty_rules.insert(pattern_index, HashMap::new());
+
+            for direction in all::<Direction>()
+            {
+                let possible_patterns = empty_rules.get_mut(&pattern_index).expect("Alles ist kaputt :(");
+
+                possible_patterns.insert(direction, Vec::new());
+            }
+        }
+
+        Self
+        {
+            rules: empty_rules,
+        }
+    }
+
+    pub fn add_rule(&mut self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize)
+    {
+        let possible_patterns = self.rules
+            .get_mut(&current_pattern_index)
+            .expect("Rules ist nicht mit allen Patterns gefüllt")
+            .get_mut(&direction)
+            .expect("Rules ist nicht komplett mit Directions gefüllt");
+
+        possible_patterns.push(next_pattern_index);
+    }
+
+    pub fn check_if_pattern_is_allowed(self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize) -> bool
+    {
+        self.rules[&current_pattern_index][&direction].contains(&next_pattern_index)
+    }
 }
 
 fn slice_into_patterns(
@@ -110,11 +163,29 @@ fn get_valid_directions(x: i32, y: i32, output_length: usize) -> Vec<Direction>
     }
 }
 
+fn get_relevant_tiles_for_checking_overlapping_patterns(
+    pattern: Pattern,
+    direction_for_checking_overlapping: Direction,
+    pattern_edge_length: usize) -> Vec<i32>
+{
+    match direction_for_checking_overlapping {
+        Direction::None => pattern.flat_definition,
+        Direction::UpLeft => vec! [ pattern.flat_definition[pattern_edge_length + 1] ],
+        Direction::Up => pattern.flat_definition[pattern_edge_length..2*pattern_edge_length].to_vec(),
+        Direction::UpRight => vec! [ pattern.flat_definition[pattern_edge_length] ],
+        Direction::Left => vec! [ pattern.flat_definition[1], pattern.flat_definition[pattern_edge_length + 1] ],
+        Direction::Right => vec! [ pattern.flat_definition[0], pattern.flat_definition[pattern_edge_length] ],
+        Direction::DownLeft => vec! [ pattern.flat_definition[1] ],
+        Direction::Down => pattern.flat_definition[0..pattern_edge_length].to_vec(),
+        Direction::DownRight => vec! [ pattern.flat_definition[0] ]
+    }
+}
+
 pub fn create_map(
     train_data: MultiVec<i32>,
-    output_length: usize,
-    pattern_size: usize,
+    output_edge_length: usize,
+    pattern_edge_length: usize,
     seed: usize)
 {
-    let patterns = slice_into_patterns(train_data, pattern_size);
+    let patterns = slice_into_patterns(train_data, pattern_edge_length);
 }

@@ -10,7 +10,7 @@ use bevy::ui::node_bundles::TextBundle;
 use bevy::{app::Plugin, ecs::system::Query, transform::components::Transform};
 
 use crate::player::Player;
-use crate::tile_world::GameObject;
+use crate::tile_world::{GameObject, ObjectType};
 
 pub struct ObjectInteractionPlugin;
 
@@ -67,7 +67,12 @@ fn update(
 
     match object {
         Some((object, _)) => {
-            text.1.sections[0].value = format!("[E] [TEXT MISSING TO PICK UP {:?}] [unimplemented]", object);
+            let desc: String = match object.get_type() {
+                Some(ObjectType::Tree) => "cut down tree".to_string(),
+                Some(ObjectType::Ship) => "loot ship".to_string(),
+                None => format!("[TEXT MISSING TO PICK UP {:?}", object),
+            };
+            text.1.sections[0].value = format!("[E] {} [unimplemented]", desc);
             *text.2 = Visibility::Visible;
         },
         None => {
