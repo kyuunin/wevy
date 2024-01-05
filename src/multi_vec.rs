@@ -1,3 +1,4 @@
+#[derive(Debug, Clone)]
 pub struct MultiVec<T> {
     pub w: usize,
     pub h: usize,
