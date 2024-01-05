@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.12.1" }
+bevy-inspector-egui = "0.22.1"
 bevy_common_assets = { version = "0.8.0", features = ["json"] }
+bevy_egui = "0.24.0"
 enum-iterator = "1.4.1"
 rand = "0.8.5"
 serde = "1.0.194"

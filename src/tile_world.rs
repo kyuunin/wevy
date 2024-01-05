@@ -17,9 +17,14 @@ impl Plugin for TileWorldPlugin {
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
 
-#[derive(Component)]
-struct TileEntity {
-    tile: i32,
+#[derive(Component, Debug)]
+pub struct GameObject {
+    tile_id: i32,
+}
+
+#[derive(Component, Debug)]
+pub struct GameTile {
+    tile_id: i32,
 }
 
 #[derive(Deserialize, Asset, TypePath)]
@@ -130,20 +135,29 @@ fn generate_on_load_complete(
                 8, 8, None, None);
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
-            let scale = 3.0;
-            let tile_scale_x = scale * pyxel_file.tilewidth as f32;
-            let tile_scale_y = scale * pyxel_file.tileheight as f32;
+            // let scale = 3.0;
+            // let tile_scale_x = scale * pyxel_file.tilewidth as f32;
+            // let tile_scale_y = scale * pyxel_file.tileheight as f32;
+
+            let tile_scale_x: f32 = 1.0;
+            let tile_scale_y: f32 = 1.0;
+            let scale: f32 = 1.0 / 32.0;
+
             for y in 0..map_data.h {
                 for x in 0..map_data.w {
                     let tile = map_data.get(x, y).unwrap();
                     if *tile != -1 {
-                        commands.spawn(SpriteSheetBundle {
-                            texture_atlas: texture_atlas_handle.clone(),
-                            sprite: TextureAtlasSprite::new(*tile as usize),
-                            transform: Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -1.0))
-                                .with_scale(Vec3::new(scale, scale, 1.0)),
-                            ..Default::default()
-                        });
+                        commands.spawn((
+                            SpriteSheetBundle {
+                                texture_atlas: texture_atlas_handle.clone(),
+                                sprite: TextureAtlasSprite::new(*tile as usize),
+                                transform: Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -1.0))
+                                    .with_scale(Vec3::new(scale, scale, 1.0)),
+                                ..Default::default()
+                            },
+                            GameTile { tile_id: *tile },
+                            Name::new(format!("Tile {tile} ({x},{y})")),
+                        ));
                     }
                 }
             }
@@ -166,13 +180,16 @@ fn generate_on_load_complete(
                             let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
                             commands.spawn((
                                 SpriteSheetBundle {
-                                texture_atlas: texture_atlas_handle.clone(),
-                                sprite: TextureAtlasSprite::new(*entity as usize),
-                                transform:
-                                    Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -0.5))
-                                    .with_scale(Vec3::new(scale, scale, 1.0)),
-                                ..Default::default()
-                            }, TileEntity { tile: *entity }));
+                                    texture_atlas: texture_atlas_handle.clone(),
+                                    sprite: TextureAtlasSprite::new(*entity as usize),
+                                    transform:
+                                        Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -0.5))
+                                        .with_scale(Vec3::new(scale, scale, 1.0)),
+                                  ..Default::default()
+                                }, 
+                                GameObject { tile_id: *entity },
+                                Name::new(format!("Object {entity} ({x},{y})")),
+                            ));
                         }
                     }
                 }
