@@ -64,7 +64,7 @@ fn setup(
         SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
             sprite: TextureAtlasSprite::new(animation_indices.first),
-            transform: Transform::from_scale(Vec3::splat(6.0)),
+            transform: Transform::from_scale(Vec3::splat(3.0)),
             ..default()
         },
         animation_indices,
@@ -74,42 +74,50 @@ fn setup(
 
 
 fn keyboard_events(
-    mut key_evr: EventReader<KeyboardInput>,
+    // mut key_evr: EventReader<KeyboardInput>,
     mut players: Query<(&AnimationTimer, &mut Transform)>,
+    input: Res<Input<KeyCode>>,
+    time: Res<Time>,
 ) {
-    use bevy::input::ButtonState;
-
-    for ev in key_evr.read() {
-        match ev.state {
-            ButtonState::Pressed => {
-                error!("Key press: {:?} ({})", ev.key_code, ev.scan_code);
-                match ev.key_code {
-                    Some(KeyCode::A) => {
-                        for (_, mut transform) in &mut players.iter_mut() {
-                            transform.translation.x -= 10.0;
-                        }
-                    },
-                    Some(KeyCode::D) => {
-                        for (_, mut transform) in &mut players.iter_mut() {
-                            transform.translation.x += 10.0;
-                        }
-                    },
-                    Some(KeyCode::W) => {
-                        for (_, mut transform) in &mut players.iter_mut() {
-                            transform.translation.y += 10.0;
-                        }
-                    },
-                    Some(KeyCode::S) => {
-                        for (_, mut transform) in &mut players.iter_mut() {
-                            transform.translation.y -= 10.0;
-                        }
-                    },
-                    _ => {}
-                }
-            }
-            ButtonState::Released => {
-                error!("Key release: {:?} ({})", ev.key_code, ev.scan_code);
-            }
+    let speed = 100.0 as f32;
+    if input.pressed(KeyCode::W) {
+        for (_, mut transform) in &mut players.iter_mut() {
+            transform.translation.y += speed * time.delta_seconds();
         }
     }
+    if input.pressed(KeyCode::S) {
+        for (_, mut transform) in &mut players.iter_mut() {
+            transform.translation.y -= speed * time.delta_seconds();
+        }
+    }
+    if input.pressed(KeyCode::A) {
+        for (_, mut transform) in &mut players.iter_mut() {
+            transform.translation.x -= speed * time.delta_seconds();
+        }
+    }
+    if input.pressed(KeyCode::D) {
+        for (_, mut transform) in &mut players.iter_mut() {
+            transform.translation.x += speed * time.delta_seconds();
+        }
+    }
+
+    // use bevy::input::ButtonState;
+    // for ev in key_evr.read() {
+    //     match ev.state {
+    //         ButtonState::Pressed => {
+    //             error!("Key press: {:?} ({})", ev.key_code, ev.scan_code);
+    //             match ev.key_code {
+    //                 Some(KeyCode::A) => {
+    //                     for (_, mut transform) in &mut players.iter_mut() {
+    //                         transform.translation.x -= 10.0;
+    //                     }
+    //                 },
+    //                 _ => {}
+    //             }
+    //         }
+    //         ButtonState::Released => {
+    //             error!("Key release: {:?} ({})", ev.key_code, ev.scan_code);
+    //         }
+    //     }
+    // }
 }
