@@ -12,6 +12,7 @@ use crate::tile_world::TileWorldPlugin;
 mod tile_world;
 mod multi_vec;
 mod wave_function_collapse_generator;
+mod object_interaction;
 
 fn main() {
     
@@ -20,6 +21,6 @@ fn main() {
         .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(PlayerPlugin)
         .add_plugins(TileWorldPlugin)
+        .add_plugins(object_interaction::ObjectInteractionPlugin)
         .run();
 }
-

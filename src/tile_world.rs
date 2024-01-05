@@ -17,12 +17,12 @@ impl Plugin for TileWorldPlugin {
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 struct GameObject {
     tile_id: i32,
 }
 
-#[derive(Component)]
+#[derive(Component, Debug)]
 struct GameTile {
     tile_id: i32,
 }
