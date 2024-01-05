@@ -135,9 +135,14 @@ fn generate_on_load_complete(
                 8, 8, None, None);
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
-            let scale = 3.0;
-            let tile_scale_x = scale * pyxel_file.tilewidth as f32;
-            let tile_scale_y = scale * pyxel_file.tileheight as f32;
+            // let scale = 3.0;
+            // let tile_scale_x = scale * pyxel_file.tilewidth as f32;
+            // let tile_scale_y = scale * pyxel_file.tileheight as f32;
+
+            let tile_scale_x: f32 = 1.0;
+            let tile_scale_y: f32 = 1.0;
+            let scale: f32 = 1.0 / 32.0;
+
             for y in 0..map_data.h {
                 for x in 0..map_data.w {
                     let tile = map_data.get(x, y).unwrap();

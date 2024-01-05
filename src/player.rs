@@ -59,16 +59,20 @@ fn setup(
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     // Use only the subset of sprites in the sheet that make up the run animation
     let animation_indices = AnimationIndices { first: 1, last: 6 };
+
+    let player_size = 0.6 / 32.0;
+    let camera_scale = 0.007;
+
     let camera = commands.spawn(
     	Camera2dBundle{
-    		transform: Transform::from_scale(Vec3::splat(0.3)),
+    		transform: Transform::from_scale(Vec3::new(camera_scale / player_size, camera_scale / player_size, 1.0)),
     		..default()
 	}).id();
     let player = commands.spawn((
         SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
             sprite: TextureAtlasSprite::new(animation_indices.first),
-            transform: Transform::from_scale(Vec3::splat(5.0)),
+            transform: Transform::from_scale(Vec3::new(player_size, player_size, 1.0)),
             ..default()
         },
         animation_indices,
@@ -88,7 +92,7 @@ fn keyboard_events(
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
-    let speed = 100.0_f32;
+    let speed: f32 = 1.0;
     if input.pressed(KeyCode::W) {
         for (_, mut transform) in &mut players.iter_mut() {
             transform.translation.y += speed * time.delta_seconds();
