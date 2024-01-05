@@ -11,6 +11,9 @@ setup-wasm:
 
 run:
     cargo run
+    
+run-release:
+    cargo run --release
 
 run-wasm:
     cargo run --target wasm32-unknown-unknown

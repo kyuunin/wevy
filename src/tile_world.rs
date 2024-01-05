@@ -1,4 +1,5 @@
-use bevy::{prelude::*, asset::LoadState};
+use bevy::{prelude::*, asset::LoadState};use bevy::prelude::*;
+use bevy_inspector_egui::prelude::*;
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
@@ -13,20 +14,51 @@ impl Plugin for TileWorldPlugin {
         app.add_systems(PreStartup, pre_setup);
         // app.add_systems(Startup, setup);
         app.add_systems(PreUpdate, generate_on_load_complete);
+        app.register_type::<GameObject>();
+        app.register_type::<GameTile>();
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
 
-#[derive(Component, Debug)]
+pub enum TileType {
+    None, Water, Field, Mountain,
+}
+
+pub enum ObjectType {
+    None, Tree, Ship,
+}
+
+#[derive(Component, Debug, Reflect)]
 pub struct GameObject {
     tile_id: i32,
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Reflect)]
 pub struct GameTile {
     tile_id: i32,
 }
 
+impl GameObject {
+    fn get_type(&self) -> ObjectType {
+        match self.tile_id {
+            12 => ObjectType::Tree,
+            13 => ObjectType::Ship,
+            _ => ObjectType::None,
+        }
+    }
+}
+/*
+impl GameTile {
+    fn top_left_type(&self) -> TileType {
+        match self.tile_id {
+            0 | 1 | 2 3 | 11 8 => TileType::Water,
+            9 0 | 1 | 2 | 10 => TileType::Field,
+            0 | 1 | 2 | 10 => TileType::Mountain,
+            _ => TileType::None,
+        }
+    }
+}
+*/
 #[derive(Deserialize, Asset, TypePath)]
 struct PyxelFile {
     // tileswide: i32, // number of tiles in tilemap in x direction, e.g. 10

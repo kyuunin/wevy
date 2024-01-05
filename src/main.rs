@@ -4,6 +4,7 @@ mod player;
 
 
 use bevy::prelude::*;
+#[cfg(debug_assertions)]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 use crate::player::PlayerPlugin;
@@ -15,12 +16,14 @@ mod wave_function_collapse_generator;
 mod object_interaction;
 
 fn main() {
-    
-    App::new()
+
+    let mut app = App::new();
+    let builder = app
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
-        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(PlayerPlugin)
         .add_plugins(TileWorldPlugin)
-        .add_plugins(object_interaction::ObjectInteractionPlugin)
-        .run();
+        .add_plugins(object_interaction::ObjectInteractionPlugin);
+    #[cfg(debug_assertions)]
+    let builder = builder.add_plugins(WorldInspectorPlugin::new());
+    builder.run();
 }
