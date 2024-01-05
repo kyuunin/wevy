@@ -17,8 +17,8 @@ impl Plugin for TileWorldPlugin {
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
 
-#[derive(Component)]
-struct TileEntity {
+#[derive(Component, Debug)]
+pub struct TileEntity {
     tile: i32,
 }
 
