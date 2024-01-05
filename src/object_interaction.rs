@@ -3,7 +3,7 @@ use bevy::sprite::collide_aabb;
 use bevy::{app::Plugin, ecs::system::Query, transform::components::Transform};
 
 use crate::player::Player;
-use crate::tile_world::TileEntity;
+use crate::tile_world::GameObject;
 
 pub struct ObjectInteractionPlugin;
 
@@ -15,7 +15,7 @@ impl Plugin for ObjectInteractionPlugin {
 
 fn update(
     players: Query<(&Player, &Transform)>,
-    mut objects: Query<(&TileEntity, &Transform)>,
+    mut objects: Query<(&GameObject, &Transform)>,
 ) {
     for (object, tile_transform) in objects.iter_mut() {
         for (_, player_transform) in &mut players.iter() {

@@ -18,12 +18,12 @@ impl Plugin for TileWorldPlugin {
 }
 
 #[derive(Component, Debug)]
-struct GameObject {
+pub struct GameObject {
     tile_id: i32,
 }
 
 #[derive(Component, Debug)]
-struct GameTile {
+pub struct GameTile {
     tile_id: i32,
 }
 
