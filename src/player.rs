@@ -75,13 +75,37 @@ fn setup(
 
 fn keyboard_events(
     mut key_evr: EventReader<KeyboardInput>,
+    mut players: Query<(&AnimationTimer, &mut Transform)>,
 ) {
     use bevy::input::ButtonState;
 
-    for ev in key_evr.iter() {
+    for ev in key_evr.read() {
         match ev.state {
             ButtonState::Pressed => {
                 error!("Key press: {:?} ({})", ev.key_code, ev.scan_code);
+                match ev.key_code {
+                    Some(KeyCode::A) => {
+                        for (_, mut transform) in &mut players.iter_mut() {
+                            transform.translation.x -= 10.0;
+                        }
+                    },
+                    Some(KeyCode::D) => {
+                        for (_, mut transform) in &mut players.iter_mut() {
+                            transform.translation.x += 10.0;
+                        }
+                    },
+                    Some(KeyCode::W) => {
+                        for (_, mut transform) in &mut players.iter_mut() {
+                            transform.translation.y += 10.0;
+                        }
+                    },
+                    Some(KeyCode::S) => {
+                        for (_, mut transform) in &mut players.iter_mut() {
+                            transform.translation.y -= 10.0;
+                        }
+                    },
+                    _ => {}
+                }
             }
             ButtonState::Released => {
                 error!("Key release: {:?} ({})", ev.key_code, ev.scan_code);

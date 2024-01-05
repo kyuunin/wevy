@@ -5,7 +5,6 @@ use std::cmp::{min, max};
 
 use crate::multi_vec::MultiVec;
 
-
 pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
     fn build(&self, app: &mut App) {
@@ -19,8 +18,8 @@ impl Plugin for TileWorldPlugin {
 
 #[derive(Deserialize, Asset, TypePath)]
 struct PyxelFile {
-    tileswide: i32, // number of tiles in x direction, e.g. 8
-    tileshigh: i32, // number of tiles in y direction, e.g. 8
+    // tileswide: i32, // number of tiles in tilemap in x direction, e.g. 10
+    // tileshigh: i32, // number of tiles in tilemap in y direction, e.g. 12
     tilewidth: i32,  // width  of single tile in pixels, e.g. 32
     tileheight: i32, // height of single tile in pixels, e.g. 32
     layers: Vec<PyxelLayer>,
@@ -52,8 +51,8 @@ struct TileAssets {
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let pyxel_handle: Handle<PyxelFile> = asset_server.load("tiles.json");
-    let tileset_handle: Handle<Image> = asset_server.load("tiles.png");
+    let pyxel_handle: Handle<PyxelFile> = asset_server.load("json/Map.json");
+    let tileset_handle: Handle<Image> = asset_server.load("textures/Map.png");
 
     commands.insert_resource(TileAssets {
         pyxel_file: pyxel_handle,
@@ -108,20 +107,7 @@ fn generate_on_load_complete(
                 }
             }
 
-            // TODO: call david
-
-            // checkerboard example
-            // let mut map_data: MultiVec<i32> = MultiVec::new(-1, 4, 4);
-            // for x in 0..4 {
-            //     for y in 0..4 {
-            //         if let Some(val) = map_data.get_mut(x, y) {
-            //             *val = ((x + y) % 2) as i32;
-            //         } else {
-            //             panic!("out of bounds");
-            //         }
-            //     }
-            // }
-
+            // TODO: call let map_data = david(tiles)
             let map_data = tiles.clone();
 
             for y in min_tile.1..=max_tile.1 {
@@ -135,15 +121,14 @@ fn generate_on_load_complete(
             let texture_atlas = TextureAtlas::from_grid(
                 tile_assets.tileset.clone(),
                 Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.tileheight as f32),
-                pyxel_file.tileswide as usize,
-                pyxel_file.tileshigh as usize, None, None);
+                8, 8, None, None);
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
             for y in 0..map_data.h {
                 for x in 0..map_data.w {
                     let tile = map_data.get(x, y).unwrap();
                     if *tile != -1 {
-                        let scale = 6.0;
+                        let scale = 3.0;
                         let tile_scale_x = scale * pyxel_file.tilewidth as f32;
                         let tile_scale_y = scale * pyxel_file.tileheight as f32;
                         commands.spawn(SpriteSheetBundle {
