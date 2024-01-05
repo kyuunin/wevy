@@ -59,7 +59,11 @@ fn setup(
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     // Use only the subset of sprites in the sheet that make up the run animation
     let animation_indices = AnimationIndices { first: 1, last: 6 };
-    let camera = commands.spawn(Camera2dBundle::default(),).id();
+    let camera = commands.spawn(
+    	Camera2dBundle{
+    		transform: Transform::from_scale(Vec3::splat(0.3)),
+    		..default()
+	}).id();
     let player = commands.spawn((
         SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
@@ -70,6 +74,7 @@ fn setup(
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
         Player,
+        Name::new("Player"),
         
     )).id();
     commands.entity(player).push_children(&[camera]);

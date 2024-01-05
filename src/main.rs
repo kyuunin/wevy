@@ -4,6 +4,7 @@ mod player;
 
 
 use bevy::prelude::*;
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 
 use crate::player::PlayerPlugin;
 use crate::tile_world::TileWorldPlugin;
@@ -16,6 +17,7 @@ fn main() {
     
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
+        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(PlayerPlugin)
         .add_plugins(TileWorldPlugin)
         .run();
