@@ -1,11 +1,11 @@
-struct MultiVec<T> {
-    w: i32,
-    h: i32,
-    data: Vec<T>
+pub struct MultiVec<T> {
+    pub w: usize,
+    pub h: usize,
+    pub data: Vec<T>
 }
 
-impl MultiVec<T> {
-    fn new(val: T, w: i32, h: i32) -> Self {
+impl<T> MultiVec<T> where T: Clone {
+    pub fn new(val: T, w: usize, h: usize) -> Self {
         Self {
             w,
             h,
@@ -13,16 +13,16 @@ impl MultiVec<T> {
         }
     }
 
-    fn get(&self, x: i32, y: i32) -> Option<&T> {
-        if x < 0 || x >= self.w || y < 0 || y >= self.h {
+    pub fn get(&self, x: usize, y: usize) -> Option<&T> {
+        if x >= self.w || y >= self.h {
             None
         } else {
             Some(&self.data[x + y * self.w])
         }
     }
 
-    fn get_mut(&mut self, x: i32, y: i32) -> Option<&mut T> {
-        if x < 0 || x >= self.w || y < 0 || y >= self.h {
+    pub fn get_mut(&mut self, x: usize, y: usize) -> Option<&mut T> {
+        if x >= self.w || y >= self.h {
             None
         } else {
             Some(&mut self.data[x + y * self.w])

@@ -2,10 +2,16 @@
 //! into a texture atlas, and changing the displayed image periodically.
 
 use bevy::prelude::*;
+use tile_world::TileWorldPlugin;
+
+mod tile_world;
+mod multi_vec;
 
 fn main() {
+    
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
+        .add_plugins(TileWorldPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, animate_sprite)
         .run();
