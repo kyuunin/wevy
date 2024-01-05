@@ -8,6 +8,7 @@ use crate::multi_vec::*;
 #[derive(Sequence, PartialEq, Eq, Hash)]
 enum Direction
 {
+    None,
     Up,
     Left,
     Down,
@@ -22,6 +23,7 @@ impl From<Direction> for (i32, i32)
 {
     fn from(value: Direction) -> Self {
         match value {
+            Direction::None => (0, 0),
             Direction::Up => (0, -1),
             Direction::Left => (-1, 0),
             Direction::Down => (0, 1),
@@ -161,11 +163,29 @@ fn get_valid_directions(x: i32, y: i32, output_length: usize) -> Vec<Direction>
     }
 }
 
+fn get_relevant_tiles_for_checking_overlapping_patterns(
+    pattern: Pattern,
+    direction_for_checking_overlapping: Direction,
+    pattern_edge_length: usize) -> Vec<i32>
+{
+    match direction_for_checking_overlapping {
+        Direction::None => pattern.flat_definition,
+        Diretion::UpLeft => vec! [ pattern.flat_definition[pattern_edge_length + 1] ],
+        Diretion::Up => pattern.flat_definition.slice[pattern_edge_length..2*pattern_edge_length],
+        Direction::UpRight => vec! [ pattern.flat_definition[pattern_edge_length] ],
+        Direction::Left => vec! [ pattern.flat_definition[1], pattern.flat_definition[pattern_edge_length + 1] ],
+        Direction::Right => vec! [ pattern.flat_definition[0], pattern.flat_definition[pattern_edge_length] ],
+        Direction::DownLeft => vec! [ pattern.flat_definition[1] ],
+        Direction::Down => pattern.flat_definition.slice[0..pattern_edge_length],
+        Direction::DownRight => vec! [ pattern.flat_definition[0] ]
+    }
+}
+
 pub fn create_map(
     train_data: MultiVec<i32>,
-    output_length: usize,
-    pattern_size: usize,
+    output_edge_length: usize,
+    pattern_edge_length: usize,
     seed: usize)
 {
-    let patterns = slice_into_patterns(train_data, pattern_size);
+    let patterns = slice_into_patterns(train_data, pattern_edge_length);
 }
