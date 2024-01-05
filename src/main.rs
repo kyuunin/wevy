@@ -10,6 +10,7 @@ use crate::tile_world::TileWorldPlugin;
 
 mod tile_world;
 mod multi_vec;
+mod wave_function_collapse_generator;
 
 fn main() {
     
