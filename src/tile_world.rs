@@ -1,7 +1,8 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
-use std::cmp::{min, max};
+use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
+use rand::prelude::*;
 
 use crate::multi_vec::MultiVec;
 
@@ -14,6 +15,11 @@ impl Plugin for TileWorldPlugin {
         app.add_systems(PreUpdate, generate_on_load_complete);
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
+}
+
+#[derive(Component)]
+struct TileEntity {
+    tile: i32,
 }
 
 #[derive(Deserialize, Asset, TypePath)]
@@ -84,21 +90,21 @@ fn generate_on_load_complete(
                 println!("layer {:?}: {:?}", layer.number, layer.name);
             }
 
-            let layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
+            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
+            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 0).unwrap();
 
-            let min_tile = layer.tiles.iter()
+            let min_tile = base_layer.tiles.iter()
                 .filter(|tile| tile.tile != -1)
                 .map(|tile| (tile.x, tile.y))
                 .fold((i32::MAX, i32::MAX), |(min_x, min_y), (x, y)| (min(min_x, x), min(min_y, y)));
-            let max_tile = layer.tiles.iter()
+            let max_tile = base_layer.tiles.iter()
                 .filter(|tile| tile.tile != -1)
                 .map(|tile| (tile.x, tile.y))
                 .fold((i32::MIN, i32::MIN), |(max_x, max_y), (x, y)| (max(max_x, x), max(max_y, y)));
             println!("min_tile: {:?}, max_tile: {:?}", min_tile, max_tile);
 
-
             let mut tiles = MultiVec::new(-1, (max_tile.0 - min_tile.0 + 1) as usize, (max_tile.1 - min_tile.1 + 1) as usize);
-            for tile in layer.tiles.iter() {
+            for tile in base_layer.tiles.iter() {
                 if tile.tile != -1 {
                     let x = (tile.x - min_tile.0) as usize;
                     let y = (tile.y - min_tile.1) as usize;
@@ -124,13 +130,13 @@ fn generate_on_load_complete(
                 8, 8, None, None);
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
 
+            let scale = 3.0;
+            let tile_scale_x = scale * pyxel_file.tilewidth as f32;
+            let tile_scale_y = scale * pyxel_file.tileheight as f32;
             for y in 0..map_data.h {
                 for x in 0..map_data.w {
                     let tile = map_data.get(x, y).unwrap();
                     if *tile != -1 {
-                        let scale = 3.0;
-                        let tile_scale_x = scale * pyxel_file.tilewidth as f32;
-                        let tile_scale_y = scale * pyxel_file.tileheight as f32;
                         commands.spawn(SpriteSheetBundle {
                             texture_atlas: texture_atlas_handle.clone(),
                             sprite: TextureAtlasSprite::new(*tile as usize),
@@ -138,6 +144,36 @@ fn generate_on_load_complete(
                                 .with_scale(Vec3::new(scale, scale, 1.0)),
                             ..Default::default()
                         });
+                    }
+                }
+            }
+
+            // for each entity tile type, spawn on base layer tiles
+            let mut spawn_entities_for_base_tile = HashMap::<i32, HashSet<i32>>::new();
+            for entity_tile in entity_layer.tiles.iter().filter(|tile| tile.tile != -1) {
+                let base_tile = base_layer.tiles.iter()
+                    .find(|tile| tile.x == entity_tile.x && tile.y == entity_tile.y).unwrap();
+                spawn_entities_for_base_tile.entry(base_tile.tile).or_insert(default()).insert(entity_tile.tile);
+            }
+
+            // Generate entities on correct base tiles
+            let spawn_rate = 0.2 as f32;
+            for y in 0..map_data.h {
+                for x in 0..map_data.w {
+                    let base_tile = map_data.get(x, y).unwrap();
+                    if let Some(entities) = spawn_entities_for_base_tile.get(base_tile)  {
+                        if rand::random::<f32>() < spawn_rate {
+                            let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
+                            commands.spawn((
+                                SpriteSheetBundle {
+                                texture_atlas: texture_atlas_handle.clone(),
+                                sprite: TextureAtlasSprite::new(*entity as usize),
+                                transform:
+                                    Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -0.5))
+                                    .with_scale(Vec3::new(scale, scale, 1.0)),
+                                ..Default::default()
+                            }, TileEntity { tile: *entity }));
+                        }
                     }
                 }
             }
