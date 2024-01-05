@@ -21,11 +21,11 @@ impl Plugin for TileWorldPlugin {
 }
 
 pub enum TileType {
-    None, Water, Field, Mountain,
+    Water, Field, Mountain,
 }
 
 pub enum ObjectType {
-    None, Tree, Ship,
+    Tree, Ship,
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -39,26 +39,38 @@ pub struct GameTile {
 }
 
 impl GameObject {
-    fn get_type(&self) -> ObjectType {
+    pub fn get_type(&self) -> Option<ObjectType> {
+        use ObjectType::*;
         match self.tile_id {
-            12 => ObjectType::Tree,
-            13 => ObjectType::Ship,
-            _ => ObjectType::None,
+            12 => Some(Tree),
+            13 => Some(Ship),
+            _  => None,
         }
     }
 }
-/*
+
 impl GameTile {
-    fn top_left_type(&self) -> TileType {
+    pub fn top_left_type(&self) -> Option<TileType> {
+        use TileType::*;
         match self.tile_id {
-            0 | 1 | 2 3 | 11 8 => TileType::Water,
-            9 0 | 1 | 2 | 10 => TileType::Field,
-            0 | 1 | 2 | 10 => TileType::Mountain,
-            _ => TileType::None,
+             0| 1| 2| 3| 8|11|15                   => Some(Water),
+             4| 5| 6| 7| 9|10|14|16|17|18|19|24|31 => Some(Field),
+            20|21|22|23|25|26|30                   => Some(Mountain),
+            _                                      => None,
+        }
+    }
+    
+    pub fn top_right_type(&self) -> Option<TileType> {
+        use TileType::*;
+        match self.tile_id {
+             0| 1| 2| 5|10|11|14                   => Some(Water),
+             3| 4| 6| 7| 9| 8|15|16|17|18|21|26|30 => Some(Field),
+            19|20|22|23|24|25|31                   => Some(Mountain),
+            _                                      => None,
         }
     }
 }
-*/
+
 #[derive(Deserialize, Asset, TypePath)]
 struct PyxelFile {
     // tileswide: i32, // number of tiles in tilemap in x direction, e.g. 10
