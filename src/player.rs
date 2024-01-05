@@ -12,7 +12,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component)]
-struct Player ();
+struct Player;
 
 #[derive(Component)]
 struct AnimationIndices {
@@ -59,8 +59,8 @@ fn setup(
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     // Use only the subset of sprites in the sheet that make up the run animation
     let animation_indices = AnimationIndices { first: 1, last: 6 };
-    commands.spawn(Camera2dBundle::default());
-    commands.spawn((
+    let camera = commands.spawn(Camera2dBundle::default(),).id();
+    let player = commands.spawn((
         SpriteSheetBundle {
             texture_atlas: texture_atlas_handle,
             sprite: TextureAtlasSprite::new(animation_indices.first),
@@ -69,7 +69,11 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-    ));
+        Player,
+        
+    )).id();
+    commands.entity(player).push_children(&[camera]);
+    ()
 }
 
 
@@ -79,7 +83,7 @@ fn keyboard_events(
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
-    let speed = 100.0 as f32;
+    let speed = 100.0_f32;
     if input.pressed(KeyCode::W) {
         for (_, mut transform) in &mut players.iter_mut() {
             transform.translation.y += speed * time.delta_seconds();
