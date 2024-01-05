@@ -28,7 +28,7 @@ struct PyxelFile {
 
 #[derive(Deserialize)]
 struct PyxelLayer {
-    // name: String,
+    name: String,
     number: i32,
     tiles: Vec<PyxelTile>,
 }
@@ -81,7 +81,11 @@ fn generate_on_load_complete(
                 "pyxel json file should be loaded since we checked that LoadState::Loaded"
             );
 
-            let layer = pyxel_file.layers.iter().find(|layer| layer.number == 0).unwrap();
+            for layer in pyxel_file.layers.iter() {
+                println!("layer {:?}: {:?}", layer.number, layer.name);
+            }
+
+            let layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
 
             let min_tile = layer.tiles.iter()
                 .filter(|tile| tile.tile != -1)
@@ -91,29 +95,42 @@ fn generate_on_load_complete(
                 .filter(|tile| tile.tile != -1)
                 .map(|tile| (tile.x, tile.y))
                 .fold((i32::MIN, i32::MIN), |(max_x, max_y), (x, y)| (max(max_x, x), max(max_y, y)));
+            println!("min_tile: {:?}, max_tile: {:?}", min_tile, max_tile);
+
 
             let mut tiles = MultiVec::new(-1, (max_tile.0 - min_tile.0 + 1) as usize, (max_tile.1 - min_tile.1 + 1) as usize);
             for tile in layer.tiles.iter() {
                 if tile.tile != -1 {
-                    *(tiles.get_mut((tile.x - min_tile.0) as usize, (tile.y - min_tile.1) as usize).unwrap()) = tile.tile;
+                    let x = (tile.x - min_tile.0) as usize;
+                    let y = (tile.y - min_tile.1) as usize;
+                    let flipped_y = (max_tile.1 - min_tile.1) as usize - y;
+                    *(tiles.get_mut(x, flipped_y).unwrap()) = tile.tile;
                 }
             }
 
             // TODO: call david
 
             // checkerboard example
-            let mut map_data: MultiVec<i32> = MultiVec::new(-1, 4, 4);
-            for x in 0..4 {
-                for y in 0..4 {
-                    if let Some(val) = map_data.get_mut(x, y) {
-                        *val = ((x + y) % 2) as i32;
-                    } else {
-                        panic!("out of bounds");
-                    }
-                }
-            }
+            // let mut map_data: MultiVec<i32> = MultiVec::new(-1, 4, 4);
+            // for x in 0..4 {
+            //     for y in 0..4 {
+            //         if let Some(val) = map_data.get_mut(x, y) {
+            //             *val = ((x + y) % 2) as i32;
+            //         } else {
+            //             panic!("out of bounds");
+            //         }
+            //     }
+            // }
 
-            // let map_data = tiles.clone();
+            let map_data = tiles.clone();
+
+            for y in min_tile.1..=max_tile.1 {
+                for x in min_tile.0..=max_tile.0 {
+                    let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
+                    print!("{:2} ", tile);
+                }
+                println!();
+            }
 
             let texture_atlas = TextureAtlas::from_grid(
                 tile_assets.tileset.clone(),
