@@ -5,11 +5,19 @@ mod player;
 
 use bevy::prelude::*;
 use crate::player::PlayerPlugin;
+use crate::tile_world::TileWorldPlugin;
+
+mod tile_world;
+mod multi_vec;
 
 fn main() {
+    
     App::new()
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
         .add_plugins(PlayerPlugin)
+        .add_plugins(TileWorldPlugin)
+        .add_systems(Startup, setup)
+        .add_systems(Update, animate_sprite)
         .run();
 }
 
