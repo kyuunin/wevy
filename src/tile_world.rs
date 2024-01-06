@@ -4,7 +4,7 @@ use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
 use rand::prelude::*;
 
-use crate::multi_vec::MultiVec;
+use crate::{multi_vec::MultiVec, wave_function_collapse_generator::{self, create_map}};
 use crate::player::Player;
 
 pub struct TileWorldPlugin;
@@ -245,7 +245,12 @@ fn generate_on_load_complete(
             }
 
             // TODO: call let map_data = david(tiles)
-            let map = tiles.clone();
+            let map = create_map(
+                tiles.clone(),
+                64,
+                2,
+                666
+            );
 
             for y in min_tile.1..=max_tile.1 {
                 for x in min_tile.0..=max_tile.0 {
