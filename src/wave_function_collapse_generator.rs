@@ -170,13 +170,13 @@ fn get_relevant_tiles_for_checking_overlapping_patterns(
 {
     match direction_for_checking_overlapping {
         Direction::None => pattern.flat_definition,
-        Diretion::UpLeft => vec! [ pattern.flat_definition[pattern_edge_length + 1] ],
-        Diretion::Up => pattern.flat_definition.slice[pattern_edge_length..2*pattern_edge_length],
+        Direction::UpLeft => vec! [ pattern.flat_definition[pattern_edge_length + 1] ],
+        Direction::Up => pattern.flat_definition[pattern_edge_length..2*pattern_edge_length].to_vec(),
         Direction::UpRight => vec! [ pattern.flat_definition[pattern_edge_length] ],
         Direction::Left => vec! [ pattern.flat_definition[1], pattern.flat_definition[pattern_edge_length + 1] ],
         Direction::Right => vec! [ pattern.flat_definition[0], pattern.flat_definition[pattern_edge_length] ],
         Direction::DownLeft => vec! [ pattern.flat_definition[1] ],
-        Direction::Down => pattern.flat_definition.slice[0..pattern_edge_length],
+        Direction::Down => pattern.flat_definition[0..pattern_edge_length].to_vec(),
         Direction::DownRight => vec! [ pattern.flat_definition[0] ]
     }
 }
