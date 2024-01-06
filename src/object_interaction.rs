@@ -1,13 +1,7 @@
-use bevy::app::{App, Startup, Update};
-use bevy::ecs::component::Component;
-use bevy::ecs::system::Commands;
-use bevy::math::{Vec2, Rect};
-use bevy::render::view::Visibility;
+use bevy::input::ButtonState;
+use bevy::input::keyboard::KeyboardInput;
+use bevy::prelude::*;
 use bevy::sprite::collide_aabb;
-use bevy::text::{TextAlignment, TextStyle, Text};
-use bevy::ui::{Style, PositionType, Val};
-use bevy::ui::node_bundles::TextBundle;
-use bevy::{app::Plugin, ecs::system::Query, transform::components::Transform};
 
 use crate::player::Player;
 use crate::tile_world::{GameObject, ObjectType};
@@ -25,11 +19,6 @@ impl Plugin for ObjectInteractionPlugin {
 struct InteractText;
 
 fn startup(mut commands: Commands) {
-    // commands.spawn(
-    //     Text2dBundle {
-    //         ..Default::default()
-    //     }
-    // );
     commands.spawn((
         TextBundle::from_section(
             "Test text",
@@ -50,9 +39,10 @@ fn startup(mut commands: Commands) {
 }
 
 fn update(
-    players: Query<(&Player, &Transform)>,
+    mut players: Query<(&Player, &Transform)>,
     mut objects: Query<(&GameObject, &Transform)>,
     mut texts: Query<(&mut InteractText, &mut Text, &mut Visibility)>,
+    mut key_evr: EventReader<KeyboardInput>,
 ) {
     let player_transform = players.iter().next().expect("no player found").1;
 
@@ -77,6 +67,25 @@ fn update(
         },
         None => {
             *text.2 = Visibility::Hidden;
+        }
+    }
+
+    if let Some((object, _)) = object { 
+        if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
+            let mut inventory = players.iter_mut().next().expect("no player found").0.inventory;
+            match object.get_type() {
+                Some(ObjectType::Tree) => {
+                    inventory.wood += 10;
+                    println!("You have {} wood", inventory.wood);
+                },
+                Some(ObjectType::Ship) => {
+                    inventory.weapons += 10;
+                    println!("You have {} weapons", inventory.weapons);
+                },
+                None => {
+                    error!("unimplemented: pick up {:?}", object);
+                }
+            }
         }
     }
 }
