@@ -2,6 +2,7 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb;
+use bevy::transform::commands;
 
 use crate::player::Player;
 use crate::tile_world::{GameObject, ObjectType};
@@ -59,14 +60,15 @@ fn startup(mut commands: Commands) {
 }
 
 fn update(
+    mut commands: Commands,
     mut players: Query<(&mut Player, &Transform)>,
-    objects: Query<(&GameObject, &Transform)>,
+    objects: Query<(Entity, &GameObject, &Transform)>,
     mut texts: Query<(&mut InteractText, &mut Text, &mut Visibility)>,
     mut key_evr: EventReader<KeyboardInput>,
 ) {
     let player_transform = players.iter().next().expect("no player found").1;
 
-    let object = objects.iter().find(|(_, tile_transform)| collide_aabb::collide(
+    let object = objects.iter().find(|(_, _, tile_transform)| collide_aabb::collide(
             tile_transform.translation,
             Vec2::new(1.0, 1.0),
             player_transform.translation,
@@ -76,10 +78,11 @@ fn update(
     let mut text = texts.iter_mut().next().expect("no text found");
 
     match object {
-        Some((object, _)) => {
+        Some((_, object, _)) => {
             let desc: String = match object.get_type() {
                 Some(ObjectType::Tree) => "cut down tree".to_string(),
                 Some(ObjectType::Ship) => "loot ship".to_string(),
+                Some(ObjectType::Stone) => "mine stone".to_string(),
                 None => format!("[TEXT MISSING TO PICK UP {:?}", object),
             };
             text.1.sections[0].value = format!("[E] {}", desc);
@@ -93,7 +96,7 @@ fn update(
     let mut player = players.iter_mut().next().expect("no player found").0;
     let inventory = &mut player.inventory;
 
-    if let Some((object, _)) = object { 
+    if let Some((entity, object, _)) = object { 
         if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
             match object.get_type() {
                 Some(ObjectType::Tree) => {
@@ -104,10 +107,15 @@ fn update(
                     inventory.weapons += 10;
                     println!("You have {} weapons", inventory.weapons);
                 },
+                Some(ObjectType::Stone) => {
+                    inventory.stone += 10;
+                    println!("You have {} stone", inventory.stone);
+                },
                 None => {
                     error!("unimplemented: pick up {:?}", object);
                 }
             }
+            commands.entity(entity).despawn();
         }
     }
 }
