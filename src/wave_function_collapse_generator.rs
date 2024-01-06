@@ -1,5 +1,6 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
+use bevy::log::info;
 use enum_iterator::{Sequence, all};
 use rand::{rngs::StdRng, SeedableRng, Rng};
 
@@ -158,6 +159,8 @@ fn slice_into_patterns(
     {
         pattern.probability = pattern.occurrences as f32 / sum_occurrences as f32;
     }
+
+    info!("sliced into {} patterns.", patterns.len());
 
     patterns
 }
@@ -350,7 +353,10 @@ fn propagate_chosen_possibility(
     rules_checker: &RulesChecker)
 {
     let mut missing_propagations = VecDeque::<(usize, usize)>::new();
+    let mut already_handled = HashSet::<(usize,usize)>::new();
+    
     missing_propagations.push_back((x_chosen_tile, y_chosen_tile));
+    already_handled.insert((x_chosen_tile, y_chosen_tile));
 
     while let Some((x_current_tile, y_current_tile)) = missing_propagations.pop_front() 
     {
@@ -374,13 +380,14 @@ fn propagate_chosen_possibility(
                 .map(|pattern_index| *pattern_index)
                 .collect();
 
-            let has_changed = updated_possible_next_patterns.len() != possible_next_patterns.len();
+            // let has_changed = updated_possible_next_patterns.len() != possible_next_patterns.len();
 
             *possible_next_patterns = updated_possible_next_patterns;
 
-            if has_changed
+            if !already_handled.contains(&(next_x, next_y))
             {
                 missing_propagations.push_back((next_x, next_y));
+                already_handled.insert((next_x, next_y));
             }
         }
     }
@@ -399,7 +406,10 @@ fn create_output_tiles(
     {
         for y in 0..output_edge_length_with_space_for_patterns
         {
-            let chosen_pattern_index = possibilities_for_tiles.get(x,y).unwrap().first().expect("No possibility left");
+            let chosen_pattern_index = possibilities_for_tiles.get(x, y).unwrap().first().expect("No possibility left");
+
+            println!();
+            print!("{:2}", chosen_pattern_index);
 
             let chosen_pattern = &patterns[*chosen_pattern_index];
 
@@ -425,11 +435,14 @@ pub fn create_map(
 {
     let mut random_number_generator = StdRng::seed_from_u64(seed);
 
+    info!("Slice into patterns...");
     let patterns = &slice_into_patterns(train_data, pattern_edge_length);
 
+    info!("train rules with top secret ultra complex algorithm");
     let rules_checker = &mut RulesChecker::new(patterns);
     train_rules(patterns, pattern_edge_length, rules_checker);
     
+    info!("init possibilites for each pattern position");
     let output_edge_length_with_space_for_patterns = output_edge_length - pattern_edge_length;
     // let possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>> = &mut Vec::new();
     let possibilities_for_tiles: &mut MultiVec<Vec<usize>> = &mut MultiVec::new(
@@ -443,15 +456,18 @@ pub fn create_map(
 
     while !is_finished(possibilities_for_tiles)
     {
+        info!("collapse single pattern position...");
         let chosen_possibility = collapse_one_possibility(
             possibilities_for_tiles,
             output_edge_length_with_space_for_patterns,
             patterns,
             &mut random_number_generator);
-
+            
         match chosen_possibility {
             Some((x_chosen_tile, y_chosen_tile)) =>
             {
+                info!("Pattern at {x_chosen_tile},{y_chosen_tile} was collapsed");
+                info!("propagate possibilites...");
                 propagate_chosen_possibility(
                     x_chosen_tile,
                     y_chosen_tile,
@@ -459,11 +475,14 @@ pub fn create_map(
                     possibilities_for_tiles,
                     rules_checker);
             },
-            None => {
+            None =>
+            {
+                info!("create output tiles...");
                 return create_output_tiles(possibilities_for_tiles, patterns, output_edge_length, output_edge_length_with_space_for_patterns, pattern_edge_length);
             },
         }
     }
 
+    info!("create output tiles...");
     return create_output_tiles(possibilities_for_tiles, patterns, output_edge_length, output_edge_length_with_space_for_patterns, pattern_edge_length);
 }
