@@ -1,7 +1,7 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
-use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
+use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
 use rand::prelude::*;
 
 use crate::multi_vec::MultiVec;
@@ -39,7 +39,7 @@ pub struct GameObject {
     tile_id: i32,
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Debug, Reflect, Clone, Copy)]
 pub struct GameTile {
     tile_id: i32,
 }
@@ -131,22 +131,22 @@ struct TileAssets {
     has_generated: bool,
 }
 
+pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile>) -> Option<(Vec2, GameTile)> {
+    let pos = pos.round();
+    let entity = map_data.0.get(pos.x as usize, pos.y as usize)?.as_ref()?;
+    Some((pos, *tiles.get_component::<GameTile>(*entity).ok()?))
+}
+
 fn test(
     map_data: Res<MapData>,
     tiles: Query<&GameTile>,
     mut players: Query<(&mut Player, &Transform)>,
 ) {
 
-    let Vec3{x,y,..} = players.iter().next().expect("no player found").1.translation;
-    let x_pos = x.round() as usize;
-    let y_pos = y.round() as usize;
-    let Some(entity) = map_data.as_ref().0.get(x_pos, y_pos) else {
-        warn!("couldn't find entity");
-        return;
-    };
-    let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
-    println!("{x_pos},{y_pos} = {:?}",tile.top_left_type())
-        
+    let player_pos = players.iter().next().expect("no player found").1.translation;
+    if let Some((Vec2{x, y}, tile)) = get_tile_at_pos(player_pos.truncate(), map_data, tiles) {
+        println!("{x},{y} = {:?}",tile.top_left_type())
+    }
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
