@@ -287,7 +287,7 @@ fn generate_on_load_complete(
             // TODO: call let map_data = david(tiles)
             let map = create_map(
                 tiles.clone(),
-                16,
+                64,
                 2,
                 666
             );

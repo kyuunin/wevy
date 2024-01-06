@@ -7,7 +7,7 @@ use rand::{rngs::StdRng, SeedableRng, Rng};
 use crate::multi_vec::*;
 
 // all::<Direction>()
-#[derive(Sequence, PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(Sequence, PartialEq, Eq, Hash, Clone, Copy, Debug)]
 enum Direction
 {
     None,
@@ -108,6 +108,7 @@ impl RulesChecker
         self.rules[&current_pattern_index][&direction].contains(&next_pattern_index)
     }
 }
+
 
 fn slice_into_patterns(
     train_data: MultiVec<i32>,
@@ -314,8 +315,9 @@ fn collapse_one_possibility(
     random_number_generator: &mut StdRng) -> Option<(usize, usize)>
 {
     let (tile_x, tile_y) = get_tile_position_with_minimal_entropy(possibilites_for_tiles, output_edge_length, patterns, random_number_generator)?;
-
+    
     let possible_pattern_indices = possibilites_for_tiles.get(tile_x, tile_y)?;
+    println!("We want to collapse {} {} to one possibility of {:?}", tile_x, tile_y, possible_pattern_indices);
 
     // let highest_probability = possible_pattern_indices
     //     .iter()
@@ -332,17 +334,30 @@ fn collapse_one_possibility(
         .map(|pattern_index| &patterns[*pattern_index])
         .scan(0.0f32, |acc, pattern| { *acc += pattern.probability; Some(*acc) })
         .collect::<Vec<f32>>();
-
+    
     let sample = random_number_generator.gen_range(0.0..(*distribution.last()?));
     let chosen_possibility_index = distribution.iter().enumerate().find(|(_, prefix_sum)| sample < **prefix_sum)?.0;
+    let chosen_pattern_index = possible_pattern_indices[chosen_possibility_index];
+
+    println!("We have chosen {} {} to be {:?}", tile_x, tile_y, chosen_possibility_index);
 
     // collapse wave function
     let possibilities_for_tile = possibilites_for_tiles
         .get_mut(tile_x, tile_y).expect("Unmöglicher Index");
-    possibilities_for_tile.clear();
-    possibilities_for_tile.push(chosen_possibility_index);
+    *possibilities_for_tile = vec![ chosen_pattern_index ];
 
     Some((tile_x, tile_y))
+}
+
+fn plot_possibilities(poss: &MultiVec<Vec<usize>>) {
+    for y in 0..poss.h
+    {
+        for x in 0..poss.w
+        {
+            print!("{:3} ", poss.get(x, y).unwrap().len());
+        }
+        println!();
+    }
 }
 
 fn propagate_chosen_possibility(
@@ -352,15 +367,20 @@ fn propagate_chosen_possibility(
     possibilites_for_tiles: &mut MultiVec<Vec<usize>>,
     rules_checker: &RulesChecker)
 {
-    let mut missing_propagations = VecDeque::<(usize, usize)>::new();
+    println!("we are starting propagation. Behold the mysteries of the universe!");
+    plot_possibilities(possibilites_for_tiles);
+
+    let mut work_queue = VecDeque::<(usize, usize)>::new();
     let mut already_handled = HashSet::<(usize,usize)>::new();
     
-    missing_propagations.push_back((x_chosen_tile, y_chosen_tile));
+    work_queue.push_back((x_chosen_tile, y_chosen_tile));
     already_handled.insert((x_chosen_tile, y_chosen_tile));
 
-    while let Some((x_current_tile, y_current_tile)) = missing_propagations.pop_front() 
+    while let Some((x_current_tile, y_current_tile)) = work_queue.pop_front() 
     {
         let possible_current_patterns = possibilites_for_tiles.get(x_current_tile, y_current_tile).unwrap().clone();
+
+        // println!("Filter neighbors of {} {}", x_current_tile, y_current_tile);
 
         for direction in get_valid_directions(x_current_tile as i32, y_current_tile as i32, output_edge_length)
         {
@@ -380,13 +400,21 @@ fn propagate_chosen_possibility(
                 .map(|pattern_index| *pattern_index)
                 .collect();
 
-            // let has_changed = updated_possible_next_patterns.len() != possible_next_patterns.len();
+            if updated_possible_next_patterns.len() == 0
+            {
+                panic!("No possible pattern left for {} {} in direction {:?}", next_x, next_y, direction);
+            }
+
+            let has_changed = updated_possible_next_patterns.len() != possible_next_patterns.len();
 
             *possible_next_patterns = updated_possible_next_patterns;
 
-            if !already_handled.contains(&(next_x, next_y))
+            // println!("We have filtered {} {}, new possibilities", next_x, next_y);
+            // plot_possibilities(possibilites_for_tiles);
+
+            if has_changed && !already_handled.contains(&(next_x, next_y))
             {
-                missing_propagations.push_back((next_x, next_y));
+                work_queue.push_back((next_x, next_y));
                 already_handled.insert((next_x, next_y));
             }
         }
@@ -433,7 +461,8 @@ pub fn create_map(
     pattern_edge_length: usize,
     seed: u64) -> MultiVec<i32>
 {
-    let mut random_number_generator = StdRng::seed_from_u64(seed);
+    // let mut random_number_generator = StdRng::seed_from_u64(seed);
+    let mut random_number_generator = StdRng::from_entropy();
 
     info!("Slice into patterns...");
     let patterns = &slice_into_patterns(train_data, pattern_edge_length);
@@ -442,6 +471,24 @@ pub fn create_map(
     let rules_checker = &mut RulesChecker::new(patterns);
     train_rules(patterns, pattern_edge_length, rules_checker);
     
+    // Print all Rules (very big output)
+    // for direction in all::<Direction>()
+    // {
+    //     info!("Rules for {:?}:", direction);
+    //     for (current_pattern_index, possible_patterns) in rules_checker.rules.iter()
+    //     {
+    //         let src_pattern = &patterns[*current_pattern_index];
+    //         for next_pattern_index in possible_patterns.get(&direction).unwrap()
+    //         {
+    //             let dst_pattern = &patterns[*next_pattern_index];
+    //             println!("{:2} {:2} -> {:2} {:2} direction {:?}\n{:2} {:2} -> {:2} {:2}\n",
+    //                 src_pattern.flat_definition[0], src_pattern.flat_definition[1], dst_pattern.flat_definition[0], dst_pattern.flat_definition[1],
+    //                 direction,
+    //                 src_pattern.flat_definition[2], src_pattern.flat_definition[3], dst_pattern.flat_definition[2], dst_pattern.flat_definition[3]);
+    //         }
+    //     }
+    // }
+
     info!("init possibilites for each pattern position");
     let output_edge_length_with_space_for_patterns = output_edge_length - pattern_edge_length;
     // let possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>> = &mut Vec::new();
@@ -462,7 +509,7 @@ pub fn create_map(
             output_edge_length_with_space_for_patterns,
             patterns,
             &mut random_number_generator);
-            
+        
         match chosen_possibility {
             Some((x_chosen_tile, y_chosen_tile)) =>
             {
