@@ -2,9 +2,9 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb;
-use bevy::transform::commands;
 
 use crate::player::Player;
+use crate::progress::{self, DestroyProgress};
 use crate::tile_world::{GameObject, ObjectType};
 
 pub struct ObjectInteractionPlugin;
@@ -65,8 +65,12 @@ fn update(
     objects: Query<(Entity, &GameObject, &Transform)>,
     mut texts: Query<(&mut InteractText, &mut Text, &mut Visibility)>,
     mut key_evr: EventReader<KeyboardInput>,
+    time: Res<Time>,
+    progress_stuff: Res<progress::ProgressStuff>,
+    running_progress: Query<&DestroyProgress>,
 ) {
-    let player_transform = players.iter().next().expect("no player found").1;
+    let (_, player_transform) = players.iter_mut().next().expect("no player found");
+    let progress_running = running_progress.iter().next().is_some();
 
     let object = objects.iter().find(|(_, _, tile_transform)| collide_aabb::collide(
             tile_transform.translation,
@@ -77,46 +81,47 @@ fn update(
 
     let mut text = texts.iter_mut().next().expect("no text found");
 
-    match object {
-        Some((_, object, _)) => {
-            let desc: String = match object.get_type() {
-                Some(ObjectType::Tree) => "cut down tree".to_string(),
-                Some(ObjectType::Ship) => "loot ship".to_string(),
-                Some(ObjectType::Stone) => "mine stone".to_string(),
-                None => format!("[TEXT MISSING TO PICK UP {:?}", object),
-            };
-            text.1.sections[0].value = format!("[E] {}", desc);
-            *text.2 = Visibility::Visible;
-        },
-        None => {
-            *text.2 = Visibility::Hidden;
-        }
+    // show text to player
+    let desc = object
+        .and_then(|(_, object, _)| { match object.get_type() {
+            Some(ObjectType::Tree) => Some("cut down tree"),
+            Some(ObjectType::Ship) => Some("loot ship"),
+            Some(ObjectType::Stone) => Some("mine stone"),
+            Some(ObjectType::Campfire) => None,
+            None => None,
+        }})
+        .map(|desc| format!("[E] {}", desc));
+    if let Some(desc) = desc {
+        text.1.sections[0].value = desc;
+        *text.2 = Visibility::Visible;
+    } else {
+        *text.2 = Visibility::Hidden;
     }
 
-    let mut player = players.iter_mut().next().expect("no player found").0;
-    let inventory = &mut player.inventory;
-
-    if let Some((entity, object, _)) = object { 
-        if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
-            match object.get_type() {
-                Some(ObjectType::Tree) => {
-                    inventory.wood += 10;
-                    println!("You have {} wood", inventory.wood);
-                },
-                Some(ObjectType::Ship) => {
-                    inventory.weapons += 10;
-                    println!("You have {} weapons", inventory.weapons);
-                },
-                Some(ObjectType::Stone) => {
-                    inventory.stone += 10;
-                    println!("You have {} stone", inventory.stone);
-                },
-                None => {
-                    error!("unimplemented: pick up {:?}", object);
+    // handle key press: start destroy progress
+    if let Some((entity, object, transform)) = object  {
+        if !progress_running { Some(()) } else { None }
+            .and(if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) { Some(()) } else { None })
+            .and(Some(DestroyProgress {
+                target: entity,
+                others: vec![],
+                get_inv: default(),
+                start_time: time.elapsed_seconds(),
+                time_to_destroy: 2.0,
+            }))
+            .and_then(|mut progress| {
+                match object.get_type() {
+                    Some(ObjectType::Tree) => progress.get_inv.wood += 10,
+                    Some(ObjectType::Ship) => progress.get_inv.weapons += 10,
+                    Some(ObjectType::Stone) => progress.get_inv.stone += 10,
+                    Some(ObjectType::Campfire) => return None,
+                    None => return None,
                 }
-            }
-            commands.entity(entity).despawn();
-        }
+                Some(progress)
+            })
+            .map(|progress| {
+                progress::start_destroy_progress(progress, &mut commands, progress_stuff, transform.translation.truncate())
+            });
     }
 }
 
