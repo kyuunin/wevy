@@ -1,6 +1,6 @@
-use bevy::prelude::*;
+use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
-use crate::player::Inventory;
+use crate::player::{Inventory, Player};
 
 
 pub struct CraftingPlugin;
@@ -78,9 +78,62 @@ fn startup(
 }
 
 fn update(
+    mut commands: Commands,
     mut recipe_texts: Query<(&mut RecipeText, &mut Text)>,
-    mut crafting_state: Res<CraftingState>,
+    mut crafting_state: ResMut<CraftingState>,
+    mut key_evr: EventReader<KeyboardInput>,
+    mut players: Query<&mut Player>,
 ) {
     let mut recipe_text = recipe_texts.iter_mut().next().expect("no recipe text found");
-    recipe_text.1.sections[0].value = format!("{}: {}", crafting_name(crafting_state.recipe), crafting_price(crafting_state.recipe));
+    recipe_text.1.sections[0].value = format!("[R] to build {} ({})", crafting_name(crafting_state.recipe), crafting_price(crafting_state.recipe).to_string());
+
+    let key_evr = key_evr.read().collect::<Vec<_>>();
+
+    // Cheats: Number keys add resources
+    #[cfg(debug_assertions)]
+    {
+        let mut player = players.iter_mut().next().expect("no player found");
+        if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Key1)) {
+            player.inventory.wood += 10;
+        }
+        if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Key2)) {
+            player.inventory.stone += 10;
+        }
+        if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Key3)) {
+            player.inventory.weapons += 10;
+        }
+    }
+
+    if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Q)) {
+        crafting_state.recipe = match crafting_state.recipe {
+            Buildable::Ship => Buildable::Campfire,
+            Buildable::Campfire => Buildable::House,
+            Buildable::House => Buildable::Ship,
+        };
+    }
+
+    if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::R)) {
+        let mut player = players.iter_mut().next().expect("no player found");
+        let price = crafting_price(crafting_state.recipe);
+        let Inventory { wood: wood_price, stone: stone_price, weapons: weapons_price } = price;
+        if player.inventory.wood >= wood_price && player.inventory.stone >= stone_price && player.inventory.weapons >= weapons_price {
+            player.inventory -= price;
+            info!("Built {}", crafting_name(crafting_state.recipe));
+
+            match crafting_state.recipe {
+                Buildable::Ship => {
+                    todo!("implement ship")
+                },
+                Buildable::Campfire => {
+                    info!("You can now cook meat on the campfire");
+
+                },
+                Buildable::House => {
+                    todo!("implement house")
+                },
+            }
+        } else {
+            info!("Not enough resources to build {}", crafting_name(crafting_state.recipe));
+        }
+    }
 }

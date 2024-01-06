@@ -1,4 +1,5 @@
-use std::{ops::Add, fmt::Formatter, fmt::Display};
+use std::{fmt::Formatter, fmt::Display};
+use derive_more::{Add, Sub, AddAssign, SubAssign};
 
 use bevy::prelude::*;
 
@@ -17,25 +18,22 @@ pub struct Player {
     pub inventory: Inventory,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Add, Sub, AddAssign, SubAssign)]
 pub struct Inventory {
     pub wood: i32,
     pub stone: i32,
     pub weapons: i32,
 }
-impl Add for Inventory {
-    type Output = Inventory;
-    fn add(self, other: Inventory) -> Inventory {
-        Inventory {
-            wood: self.wood + other.wood,
-            stone: self.stone + other.stone,
-            weapons: self.weapons + other.weapons,
-        }
-    }
-}
 impl Display for Inventory {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Wood: {}, Stone: {}, Weapons: {}", self.wood, self.stone, self.weapons)
+        vec![if self.wood > 0 { Some(format!("{} wood", self.wood)) } else { None },
+             if self.stone > 0 { Some(format!("{} stone", self.stone)) } else { None },
+             if self.weapons > 0 { Some(format!("{} weapons", self.weapons)) } else { None }]
+            .into_iter()
+            .filter_map(|x| x)
+            .collect::<Vec<String>>()
+            .join(", ")
+            .fmt(f)
     }
 }
 

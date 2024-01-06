@@ -135,12 +135,12 @@ fn test(
     tiles: Query<&GameTile>
 ) {
 
-    let Some(entity) = map_data.as_ref().0.get(10,10) else {
-        warn!("couldn't find entity");
-        return;
-    };
-    let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
-    println!("{:?}",tile.top_left_type())
+    // let Some(entity) = map_data.as_ref().0.get(10,10) else {
+    //     warn!("couldn't find entity");
+    //     return;
+    // };
+    // let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
+    // println!("{:?}",tile.top_left_type())
         
 }
 
