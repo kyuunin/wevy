@@ -1,7 +1,7 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
-use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
+use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
 use rand::prelude::*;
 
 use crate::multi_vec::MultiVec;
@@ -24,24 +24,36 @@ impl Plugin for TileWorldPlugin {
 #[derive(Default, Resource)]
 pub struct MapData(MultiVec<Option<Entity>>);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TileType {
     Water, Field, Mountain,
 }
 
 #[derive(Debug)]
 pub enum ObjectType {
-    Tree, Ship, Stone
+    Tree, Ship, Stone, Campfire
+}
+
+impl From<ObjectType> for GameObject {
+    fn from(object_type: ObjectType) -> Self {
+        use ObjectType::*;
+        match object_type {
+            Tree => GameObject { tile_id: 12 },
+            Ship => GameObject { tile_id: 13 },
+            Stone => GameObject { tile_id: 27 },
+            Campfire => GameObject { tile_id: 29 },
+        }
+    }
 }
 
 #[derive(Component, Debug, Reflect)]
 pub struct GameObject {
-    tile_id: i32,
+    pub tile_id: i32,
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Debug, Reflect, Clone, Copy)]
 pub struct GameTile {
-    tile_id: i32,
+    pub tile_id: i32,
 }
 
 impl GameObject {
@@ -51,6 +63,7 @@ impl GameObject {
             12 => Some(Tree),
             13 => Some(Ship),
             27 => Some(Stone),
+            29 => Some(Campfire),
             _  => None,
         }
     }
@@ -125,10 +138,21 @@ struct PyxelTile {
 }
 
 #[derive(Resource)]
-struct TileAssets {
+pub struct TileAssets {
     pyxel_file: Handle<PyxelFile>,
     tileset: Handle<Image>,
     has_generated: bool,
+    texture_atlas: Handle<TextureAtlas>,
+}
+
+pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile>) -> Option<(usize, usize, GameTile)> {
+    let pos = pos.round();
+    if pos.x < -0.5 {return None}
+    let x = pos.x as usize;
+    if pos.y < -0.5 {return None}
+    let y = pos.y as usize;
+    let entity = map_data.0.get(x, y)?.as_ref()?;
+    Some((x, y, *tiles.get_component::<GameTile>(*entity).ok()?))
 }
 
 fn test(
@@ -137,16 +161,15 @@ fn test(
     mut players: Query<(&mut Player, &Transform)>,
 ) {
 
-    let Vec3{x,y,..} = players.iter().next().expect("no player found").1.translation;
-    let x_pos = x.round() as usize;
-    let y_pos = y.round() as usize;
-    let Some(entity) = map_data.as_ref().0.get(x_pos, y_pos) else {
-        warn!("couldn't find entity");
+    let player_pos = players.iter().next().expect("no player found").1.translation;
+    let Some((x, y, tile)) = get_tile_at_pos(player_pos.truncate(), map_data, tiles) else {
+        warn!("Couldn't get tile");
         return;
     };
-    let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
-    println!("{x_pos},{y_pos} = {:?}",tile.top_left_type())
-        
+    println!("{x},{y} = {:?}",tile.top_left_type());
+    println!("{x},{y} = {:?}",tile.top_right_type());
+    println!("{x},{y} = {:?}",tile.bottom_left_type());
+    println!("{x},{y} = {:?}",tile.bottom_right_type());
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -157,7 +180,21 @@ fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         pyxel_file: pyxel_handle,
         tileset: tileset_handle,
         has_generated: false,
+        texture_atlas: default(),
     });
+}
+
+pub fn create_bundle_for_tile(x: usize, y: usize, tile_id: i32, z: f32,
+    tile_assets: &TileAssets
+) -> SpriteSheetBundle {
+    SpriteSheetBundle {
+        texture_atlas: tile_assets.texture_atlas.clone(),
+        sprite: TextureAtlasSprite::new(tile_id as usize),
+        transform:
+            Transform::from_translation(Vec3::new(x as f32, y as f32, z))
+            .with_scale(Vec3::new(1.0 / 32.0, 1.0 / 32.0, 1.0)),
+        ..Default::default()
+    }
 }
 
 fn generate_on_load_complete(
@@ -223,14 +260,7 @@ fn generate_on_load_complete(
                 Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.tileheight as f32),
                 8, 8, None, None);
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
-
-            // let scale = 3.0;
-            // let tile_scale_x = scale * pyxel_file.tilewidth as f32;
-            // let tile_scale_y = scale * pyxel_file.tileheight as f32;
-
-            let tile_scale_x: f32 = 1.0;
-            let tile_scale_y: f32 = 1.0;
-            let scale: f32 = 1.0 / 32.0;
+            tile_assets.texture_atlas = texture_atlas_handle;
             
             *map_data.as_mut() = MapData(MultiVec::new(None, map.w, map.h));
             for y in 0..map.h {
@@ -238,13 +268,7 @@ fn generate_on_load_complete(
                     let tile = map.get(x, y).unwrap();
                     if *tile != -1 {
                         let id = commands.spawn((
-                            SpriteSheetBundle {
-                                texture_atlas: texture_atlas_handle.clone(),
-                                sprite: TextureAtlasSprite::new(*tile as usize),
-                                transform: Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -1.0))
-                                    .with_scale(Vec3::new(scale, scale, 1.0)),
-                                ..Default::default()
-                            },
+                            create_bundle_for_tile(x, y, *tile, -1.0, &*tile_assets),
                             GameTile { tile_id: *tile },
                             Name::new(format!("Tile {tile} ({x},{y})")),
                         )).id();
@@ -270,14 +294,7 @@ fn generate_on_load_complete(
                         if rand::random::<f32>() < spawn_rate {
                             let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
                             commands.spawn((
-                                SpriteSheetBundle {
-                                    texture_atlas: texture_atlas_handle.clone(),
-                                    sprite: TextureAtlasSprite::new(*entity as usize),
-                                    transform:
-                                        Transform::from_translation(Vec3::new(tile_scale_x * x as f32, tile_scale_y * y as f32, -0.5))
-                                        .with_scale(Vec3::new(scale, scale, 1.0)),
-                                  ..Default::default()
-                                }, 
+                                create_bundle_for_tile(x, y, *entity, -0.5, &*tile_assets),
                                 GameObject { tile_id: *entity },
                                 Name::new(format!("Object {entity} ({x},{y})")),
                             ));
