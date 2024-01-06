@@ -39,14 +39,14 @@ fn startup(mut commands: Commands) {
 }
 
 fn update(
-    mut players: Query<(&Player, &Transform)>,
-    mut objects: Query<(&GameObject, &Transform)>,
+    mut players: Query<(&mut Player, &Transform)>,
+    objects: Query<(&GameObject, &Transform)>,
     mut texts: Query<(&mut InteractText, &mut Text, &mut Visibility)>,
     mut key_evr: EventReader<KeyboardInput>,
 ) {
     let player_transform = players.iter().next().expect("no player found").1;
 
-    let object = objects.iter_mut().find(|(_, tile_transform)| collide_aabb::collide(
+    let object = objects.iter().find(|(_, tile_transform)| collide_aabb::collide(
             tile_transform.translation,
             Vec2::new(1.0, 1.0),
             player_transform.translation,
@@ -62,7 +62,7 @@ fn update(
                 Some(ObjectType::Ship) => "loot ship".to_string(),
                 None => format!("[TEXT MISSING TO PICK UP {:?}", object),
             };
-            text.1.sections[0].value = format!("[E] {} [unimplemented]", desc);
+            text.1.sections[0].value = format!("[E] {}", desc);
             *text.2 = Visibility::Visible;
         },
         None => {
@@ -72,7 +72,9 @@ fn update(
 
     if let Some((object, _)) = object { 
         if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
-            let mut inventory = players.iter_mut().next().expect("no player found").0.inventory;
+            let mut player = players.iter_mut().next().expect("no player found").0;
+            let inventory = &mut player.inventory;
+
             match object.get_type() {
                 Some(ObjectType::Tree) => {
                     inventory.wood += 10;
