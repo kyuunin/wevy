@@ -3,10 +3,8 @@ use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
 use rand::prelude::*;
-
 use bevy::sprite::collide_aabb;
-
-use crate::multi_vec::MultiVec;
+use crate::{multi_vec::MultiVec, wave_function_collapse_generator::{self, create_map}};
 use crate::player::Player;
 
 pub struct TileWorldPlugin;
@@ -185,7 +183,7 @@ fn test(
             let Some((x, y, tile)) = get_tile_at_pos(
                     Vec2::new(player_pos.x + x_offset as f32, player_pos.y + y_offset as f32),
                      &map_data, &tiles) else {
-                warn!("Couldn't get tile");
+                //warn!("Couldn't get tile");
                 continue;
             };
             let x = x as f32;
@@ -287,12 +285,26 @@ fn generate_on_load_complete(
             }
 
             // TODO: call let map_data = david(tiles)
-            let map = tiles.clone();
+            let map = create_map(
+                tiles.clone(),
+                16,
+                2,
+                666
+            );
 
-            for y in min_tile.1..=max_tile.1 {
-                for x in min_tile.0..=max_tile.0 {
-                    let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
-                    print!("{:2} ", tile);
+            // for y in min_tile.1..=max_tile.1 {
+            //     for x in min_tile.0..=max_tile.0 {
+            //         let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
+            //         print!("{:2} ", tile);
+            //     }
+            //     println!();
+            // }
+
+            for y in 0..map.h
+            {
+                for x in 0..map.w
+                {
+                    print!("{:2}", map.get(x, y).unwrap());
                 }
                 println!();
             }

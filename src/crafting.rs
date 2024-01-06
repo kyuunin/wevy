@@ -1,6 +1,6 @@
 use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
-use crate::{player::{Inventory, Player}, tile_world::{get_tile_at_pos, MapData, GameTile, TileType, create_bundle_for_tile, ObjectType, GameObject, TileAssets}};
+use crate::{player::{Inventory, Player}, tile_world::{get_tile_at_pos, MapData, GameTile, TileType, create_bundle_for_tile, ObjectType, GameObject, TileAssets}, progress::{self, BuildProgress}};
 
 
 pub struct CraftingPlugin;
@@ -85,7 +85,9 @@ fn update(
     mut players: Query<(&mut Player, &Transform)>,
     map_data: Res<MapData>,
     tiles: Query<&GameTile>,
-    tile_assets: Res<TileAssets>
+    tile_assets: Res<TileAssets>,
+    progress_stuff: Res<progress::ProgressStuff>,
+    time: Res<Time>,
 ) {
     let mut recipe_text = recipe_texts.iter_mut().next().expect("no recipe text found");
     recipe_text.1.sections[0].value = format!("[R] to build {} ({})\n[Q] next recipe", crafting_name(crafting_state.recipe), crafting_price(crafting_state.recipe).to_string());
@@ -132,31 +134,28 @@ fn update(
                 || tile.top_left_type() == Some(TileType::Field)
                 || tile.top_right_type() == Some(TileType::Field);
 
-            let spawned_entity: Option<Entity> = match crafting_state.recipe {
+            match crafting_state.recipe {
                 Buildable::Ship => {
                     todo!("implement ship")
                 },
                 Buildable::Campfire => {
                     if has_land {
                         info!("You can now cook meat on the campfire");
-                        let tile_id = GameObject::from(ObjectType::Campfire).tile_id;
-                        Some(commands.spawn((
-                            create_bundle_for_tile(x, y, tile_id, 0.0, &*tile_assets),
-                            GameObject { tile_id: tile_id },
-                        )).id())
+                        progress::start_build_progress(BuildProgress {
+                            others: vec![],
+                            price_inv: price,
+                            start_time: time.elapsed_seconds(),
+                            time_to_build: 5.0,
+                            buildable: Buildable::Campfire,
+                        }, &mut commands, progress_stuff, Vec2::new(x as f32, y as f32));
                     } else {
                         info!("You can only build a campfire on land");
-                        None
                     }
                 },
                 Buildable::House => {
                     todo!("implement house");
                 },
             };
-            if let Some(_) = spawned_entity {
-                player.inventory -= price;
-                info!("Built {}", crafting_name(crafting_state.recipe));
-            }
         } else {
             info!("Not enough resources to build {}", crafting_name(crafting_state.recipe));
         }
