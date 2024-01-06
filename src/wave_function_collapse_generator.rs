@@ -5,7 +5,7 @@ use enum_iterator::{Sequence, all};
 use crate::multi_vec::*;
 
 // all::<Direction>()
-#[derive(Sequence, PartialEq, Eq, Hash)]
+#[derive(Sequence, PartialEq, Eq, Hash, Clone, Copy)]
 enum Direction
 {
     None,
@@ -36,6 +36,25 @@ impl From<Direction> for (i32, i32)
     }
 }
 
+impl TryFrom<(i32, i32)> for Direction {
+    type Error = String;
+
+    fn try_from(value: (i32, i32)) -> Result<Self, Self::Error> {
+        match value {
+            (0, 0) => Ok(Direction::None),
+            (0, -1) => Ok(Direction::Up),
+            (-1, 0) => Ok(Direction::Left),
+            (0, 1) => Ok(Direction::Down),
+            (1, 0) => Ok(Direction::Right),
+            (-1, -1) => Ok(Direction::UpLeft),
+            (1, -1) => Ok(Direction::UpRight),
+            (-1, 1) => Ok(Direction::DownLeft),
+            (1, 1) => Ok(Direction::DownRight),
+            (x, y) => Err(format!("Wrong direction! X = {x}, Y = {y}")),
+        }
+    }
+}
+
 struct Pattern
 {
     occurrences: usize,
@@ -46,7 +65,6 @@ struct Pattern
 struct RulesChecker
 {
     rules: HashMap<usize, HashMap<Direction, Vec<usize>>>,
-    // fn add_rule(&mut self)
 }
 
 impl RulesChecker
@@ -164,12 +182,12 @@ fn get_valid_directions(x: i32, y: i32, output_length: usize) -> Vec<Direction>
 }
 
 fn get_relevant_tiles_for_checking_overlapping_patterns(
-    pattern: Pattern,
+    pattern: &Pattern,
     direction_for_checking_overlapping: Direction,
     pattern_edge_length: usize) -> Vec<i32>
 {
     match direction_for_checking_overlapping {
-        Direction::None => pattern.flat_definition,
+        Direction::None => pattern.flat_definition.clone(),
         Direction::UpLeft => vec! [ pattern.flat_definition[pattern_edge_length + 1] ],
         Direction::Up => pattern.flat_definition[pattern_edge_length..2*pattern_edge_length].to_vec(),
         Direction::UpRight => vec! [ pattern.flat_definition[pattern_edge_length] ],
@@ -178,6 +196,32 @@ fn get_relevant_tiles_for_checking_overlapping_patterns(
         Direction::DownLeft => vec! [ pattern.flat_definition[1] ],
         Direction::Down => pattern.flat_definition[0..pattern_edge_length].to_vec(),
         Direction::DownRight => vec! [ pattern.flat_definition[0] ]
+    }
+}
+
+fn train_rules(patterns: &Vec<Pattern>, pattern_edge_length: usize, rules_checker: &mut RulesChecker)
+{
+    for current_pattern_for_rule_extraction_index in 0..patterns.len()
+    {
+        for direction in all::<Direction>()
+        {
+            for next_pattern_for_rule_extraction_index in 0..patterns.len()
+            {
+                let overlapping_tiles_next_pattern = get_relevant_tiles_for_checking_overlapping_patterns(&patterns[next_pattern_for_rule_extraction_index], direction, pattern_edge_length);
+                
+                let direction_as_tuple:(i32, i32) = direction.into();
+                let opposite_direction_as_tuple = (direction_as_tuple.0 * -1, direction_as_tuple.1 * -1);
+
+                let opposite_direction: Direction = opposite_direction_as_tuple.try_into().expect("Error when getting opposite direction");
+                
+                let overlapping_tiles_current_pattern = get_relevant_tiles_for_checking_overlapping_patterns(&patterns[current_pattern_for_rule_extraction_index], opposite_direction, pattern_edge_length);
+
+                if overlapping_tiles_next_pattern == overlapping_tiles_current_pattern
+                {
+                    rules_checker.add_rule(current_pattern_for_rule_extraction_index, direction, next_pattern_for_rule_extraction_index)
+                }
+            }
+        }
     }
 }
 
