@@ -1,14 +1,12 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
-use crate::player::Player;
+use crate::player::{Player, Inventory};
 
 #[derive(Component)]
 pub struct DestroyProgress {
     pub target: Entity,
     pub others: Vec<Entity>,
-    pub stone: i32,
-    pub wood: i32,
-    pub weapons: i32,
+    pub get_inv: Inventory,
     pub start_time: f32,
     pub time_to_destroy: f32,
 }
@@ -68,7 +66,7 @@ fn update_destroy(
     time: Res<Time>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut Transform, &mut DestroyProgress)>,
-    mut players: Query<(&mut Player)>,
+    mut players: Query<&mut Player>,
     input: Res<Input<KeyCode>>,
 ) {
 
@@ -83,7 +81,7 @@ fn update_destroy(
     }
 
     // update progress bar
-    for (entity, mut transform, mut progress) in &mut query {
+    for (entity, mut transform, progress) in &mut query {
         let progress_time = time.elapsed_seconds() - progress.start_time;
         let progress_percent = progress_time / progress.time_to_destroy;
         transform.scale.x = 0.5 * progress_percent;
@@ -91,9 +89,7 @@ fn update_destroy(
             // completed!
 
             let mut player = players.iter_mut().next().expect("no player found");
-            player.inventory.stone += progress.stone;
-            player.inventory.wood += progress.wood;
-            player.inventory.weapons += progress.weapons;
+            player.inventory = player.inventory + progress.get_inv;
 
             for other in progress.others.iter() {
                 commands.entity(*other).despawn();

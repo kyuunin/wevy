@@ -1,5 +1,7 @@
+use std::{fmt::Formatter, fmt::Display};
+use derive_more::{Add, Sub, AddAssign, SubAssign};
+
 use bevy::prelude::*;
-use bevy::input::keyboard::KeyboardInput;
 
 pub struct PlayerPlugin;
 
@@ -16,10 +18,23 @@ pub struct Player {
     pub inventory: Inventory,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Add, Sub, AddAssign, SubAssign)]
 pub struct Inventory {
     pub wood: i32,
     pub stone: i32,
     pub weapons: i32,
+}
+impl Display for Inventory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        vec![if self.wood > 0 { Some(format!("{} wood", self.wood)) } else { None },
+             if self.stone > 0 { Some(format!("{} stone", self.stone)) } else { None },
+             if self.weapons > 0 { Some(format!("{} weapons", self.weapons)) } else { None }]
+            .into_iter()
+            .filter_map(|x| x)
+            .collect::<Vec<String>>()
+            .join(", ")
+            .fmt(f)
+    }
 }
 
 #[derive(Component)]
