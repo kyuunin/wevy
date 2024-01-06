@@ -3,7 +3,7 @@ use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
 use rand::prelude::*;
-
+use bevy::sprite::collide_aabb;
 use crate::{multi_vec::MultiVec, wave_function_collapse_generator::{self, create_map}};
 use crate::player::Player;
 
@@ -24,12 +24,12 @@ impl Plugin for TileWorldPlugin {
 #[derive(Default, Resource)]
 pub struct MapData(MultiVec<Option<Entity>>);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TileType {
     Water, Field, Mountain,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum ObjectType {
     Tree, Ship, Stone, Campfire
 }
@@ -46,7 +46,7 @@ impl From<ObjectType> for GameObject {
     }
 }
 
-#[derive(Component, Debug, Reflect)]
+#[derive(Component, Debug, Reflect, Copy, Clone)]
 pub struct GameObject {
     pub tile_id: i32,
 }
@@ -145,7 +145,7 @@ pub struct TileAssets {
     texture_atlas: Handle<TextureAtlas>,
 }
 
-pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile>) -> Option<(usize, usize, GameTile)> {
+pub fn get_tile_at_pos(pos: Vec2, map_data: &Res<MapData>, tiles: &Query<&GameTile>) -> Option<(usize, usize, GameTile)> {
     let pos = pos.round();
     if pos.x < -0.5 {return None}
     let x = pos.x as usize;
@@ -155,21 +155,61 @@ pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile
     Some((x, y, *tiles.get_component::<GameTile>(*entity).ok()?))
 }
 
+fn handel_collision(tile: Option<TileType>, pos: Vec3, player_transform: &Transform) -> Option<()>{
+    tile?;
+    if collide_aabb::collide(
+            pos,
+            Vec2::new(0.5, 0.5),
+            player_transform.translation,
+            player_transform.scale.truncate() * 32.0
+    ).is_some() {
+        println!("{pos:?} collided {tile:?}");
+    } else {
+        println!("{pos:?} not collided");
+    }
+    Some(())
+}
+
 fn test(
     map_data: Res<MapData>,
     tiles: Query<&GameTile>,
     mut players: Query<(&mut Player, &Transform)>,
 ) {
 
-    let player_pos = players.iter().next().expect("no player found").1.translation;
-    let Some((x, y, tile)) = get_tile_at_pos(player_pos.truncate(), map_data, tiles) else {
-        warn!("Couldn't get tile");
-        return;
-    };
-    println!("{x},{y} = {:?}",tile.top_left_type());
-    println!("{x},{y} = {:?}",tile.top_right_type());
-    println!("{x},{y} = {:?}",tile.bottom_left_type());
-    println!("{x},{y} = {:?}",tile.bottom_right_type());
+    let (_, player_transform) = players.iter().next().expect("no player found");
+    let player_pos = player_transform.translation;
+    for x_offset in -1..=1 {
+        for y_offset in -1..1 {
+            let Some((x, y, tile)) = get_tile_at_pos(
+                    Vec2::new(player_pos.x + x_offset as f32, player_pos.y + y_offset as f32),
+                     &map_data, &tiles) else {
+                warn!("Couldn't get tile");
+                continue;
+            };
+            let x = x as f32;
+            let y = y  as f32;
+            handel_collision(
+                tile.top_left_type(),
+                Vec3{x: x-0.25, y: y+0.25, z: 1.},
+                player_transform,
+            );
+            handel_collision(
+                tile.top_right_type(),
+                Vec3{x: x+0.25, y: y+0.25, z: 1.},
+                player_transform,
+            );
+            handel_collision(
+                tile.bottom_left_type(),
+                Vec3{x: x-0.25, y: y-0.25, z: 1.},
+                player_transform,
+            );
+            handel_collision(
+                tile.bottom_right_type(),
+                Vec3{x: x+0.25, y: y-0.25, z: 1.},
+                player_transform,
+            );
+        }
+    }
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
