@@ -25,7 +25,7 @@ pub enum TileType {
 }
 
 pub enum ObjectType {
-    Tree, Ship,
+    Tree, Ship, Stone
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -44,6 +44,7 @@ impl GameObject {
         match self.tile_id {
             12 => Some(Tree),
             13 => Some(Ship),
+            27 => Some(Stone),
             _  => None,
         }
     }
