@@ -16,9 +16,13 @@ impl Plugin for TileWorldPlugin {
         app.add_systems(PreUpdate, generate_on_load_complete);
         app.register_type::<GameObject>();
         app.register_type::<GameTile>();
+        app.init_resource::<MapData>();
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
+
+#[derive(Default, Resource)]
+pub struct MapData(MultiVec<Entity>);
 
 pub enum TileType {
     Water, Field, Mountain,
