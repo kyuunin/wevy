@@ -144,10 +144,14 @@ struct TileAssets {
     has_generated: bool,
 }
 
-pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile>) -> Option<(Vec2, GameTile)> {
+pub fn get_tile_at_pos(pos: Vec2, map_data: Res<MapData>, tiles: Query<&GameTile>) -> Option<(usize, usize, GameTile)> {
     let pos = pos.round();
-    let entity = map_data.0.get(pos.x as usize, pos.y as usize)?.as_ref()?;
-    Some((pos, *tiles.get_component::<GameTile>(*entity).ok()?))
+    if pos.x < -0.5 {return None}
+    let x = pos.x as usize;
+    if pos.y < -0.5 {return None}
+    let y = pos.y as usize;
+    let entity = map_data.0.get(x, y)?.as_ref()?;
+    Some((x, y, *tiles.get_component::<GameTile>(*entity).ok()?))
 }
 
 fn test(
@@ -157,9 +161,14 @@ fn test(
 ) {
 
     let player_pos = players.iter().next().expect("no player found").1.translation;
-    if let Some((Vec2{x, y}, tile)) = get_tile_at_pos(player_pos.truncate(), map_data, tiles) {
-        println!("{x},{y} = {:?}",tile.top_left_type())
-    }
+    let Some((x, y, tile)) = get_tile_at_pos(player_pos.truncate(), map_data, tiles) else {
+        warn!("Couldn't get tile");
+        return;
+    };
+    println!("{x},{y} = {:?}",tile.top_left_type());
+    println!("{x},{y} = {:?}",tile.top_right_type());
+    println!("{x},{y} = {:?}",tile.bottom_left_type());
+    println!("{x},{y} = {:?}",tile.bottom_right_type());
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
