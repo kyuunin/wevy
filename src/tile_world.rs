@@ -12,6 +12,7 @@ impl Plugin for TileWorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(JsonAssetPlugin::<PyxelFile>::new(&["json"])); // register .json extension (example advises for *."map.json")
         app.add_systems(PreStartup, pre_setup);
+        app.add_systems(Update, test);
         // app.add_systems(Startup, setup);
         app.add_systems(PreUpdate, generate_on_load_complete);
         app.register_type::<GameObject>();
@@ -22,12 +23,14 @@ impl Plugin for TileWorldPlugin {
 }
 
 #[derive(Default, Resource)]
-pub struct MapData(MultiVec<Entity>);
+pub struct MapData(MultiVec<Option<Entity>>);
 
+#[derive(Debug)]
 pub enum TileType {
     Water, Field, Mountain,
 }
 
+#[derive(Debug)]
 pub enum ObjectType {
     Tree, Ship, Stone
 }
@@ -129,6 +132,20 @@ struct TileAssets {
     has_generated: bool,
 }
 
+fn test(
+    map_data: Res<MapData>,
+    tiles: Query<&GameTile>
+) {
+
+    let Some(entity) = map_data.as_ref().0.get(10,10) else {
+        warn!("couldn't find entity");
+        return;
+    };
+    let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
+    println!("{:?}",tile.top_left_type())
+        
+}
+
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let pyxel_handle: Handle<PyxelFile> = asset_server.load("json/Map.json");
     let tileset_handle: Handle<Image> = asset_server.load("textures/Map.png");
@@ -144,6 +161,7 @@ fn generate_on_load_complete(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
     mut tile_assets: ResMut<TileAssets>,
+    mut map_data: ResMut<MapData>,
     pyxel_file_assets: Res<Assets<PyxelFile>>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
 ) {
@@ -187,7 +205,7 @@ fn generate_on_load_complete(
             }
 
             // TODO: call let map_data = david(tiles)
-            let map_data = tiles.clone();
+            let map = tiles.clone();
 
             for y in min_tile.1..=max_tile.1 {
                 for x in min_tile.0..=max_tile.0 {
@@ -210,12 +228,13 @@ fn generate_on_load_complete(
             let tile_scale_x: f32 = 1.0;
             let tile_scale_y: f32 = 1.0;
             let scale: f32 = 1.0 / 32.0;
-
-            for y in 0..map_data.h {
-                for x in 0..map_data.w {
-                    let tile = map_data.get(x, y).unwrap();
+            
+            *map_data.as_mut() = MapData(MultiVec::new(None, map.w, map.h));
+            for y in 0..map.h {
+                for x in 0..map.w {
+                    let tile = map.get(x, y).unwrap();
                     if *tile != -1 {
-                        commands.spawn((
+                        let id = commands.spawn((
                             SpriteSheetBundle {
                                 texture_atlas: texture_atlas_handle.clone(),
                                 sprite: TextureAtlasSprite::new(*tile as usize),
@@ -225,7 +244,8 @@ fn generate_on_load_complete(
                             },
                             GameTile { tile_id: *tile },
                             Name::new(format!("Tile {tile} ({x},{y})")),
-                        ));
+                        )).id();
+                        *map_data.as_mut().0.get_mut(x, y).expect("Storing map data failed") = Some(id);
                     }
                 }
             }
@@ -240,9 +260,9 @@ fn generate_on_load_complete(
 
             // Generate entities on correct base tiles
             let spawn_rate = 0.2 as f32;
-            for y in 0..map_data.h {
-                for x in 0..map_data.w {
-                    let base_tile = map_data.get(x, y).unwrap();
+            for y in 0..map.h {
+                for x in 0..map.w {
+                    let base_tile = map.get(x, y).unwrap();
                     if let Some(entities) = spawn_entities_for_base_tile.get(base_tile)  {
                         if rand::random::<f32>() < spawn_rate {
                             let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
