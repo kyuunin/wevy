@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use enum_iterator::{Sequence, all};
+use rand::{rngs::StdRng, SeedableRng, Rng};
 
 use crate::multi_vec::*;
 
@@ -69,7 +70,7 @@ struct RulesChecker
 
 impl RulesChecker
 {
-    pub fn new(patterns: Vec<Pattern>) -> Self
+    pub fn new(patterns: &Vec<Pattern>) -> Self
     {
         let mut empty_rules = HashMap::<usize, HashMap<Direction, Vec<usize>>>::new();
 
@@ -225,11 +226,77 @@ fn train_rules(patterns: &Vec<Pattern>, pattern_edge_length: usize, rules_checke
     }
 }
 
+fn initialize_possibilities_for_tiles(output_edge_length: usize, all_pattern_indices: Vec<usize>, possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>>)
+{
+    for x in 0..output_edge_length
+    {
+        let mut possibilites_per_tile: Vec<Vec<usize>> = Vec::new();
+
+        for y in 0..output_edge_length
+        {
+            possibilites_per_tile.push(all_pattern_indices.clone());
+        }
+
+        possibilites_for_tiles.push(possibilites_per_tile);
+    }
+}
+
+fn is_finished(possibilites_for_tiles: &Vec<Vec<Vec<usize>>>) -> bool
+{
+    for row in possibilites_for_tiles
+    {
+        for possibilities_for_one_tile in row
+        {
+            if possibilities_for_one_tile.len() > 1
+            {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
+fn get_shannon_entropy_for_tile(
+    x: usize,
+    y: usize,
+    possibilites_for_tiles: &Vec<Vec<Vec<usize>>>,
+    patterns: &Vec<Pattern>,
+    random_number_generator: &mut StdRng) -> f32
+{
+    if possibilites_for_tiles[x][y].len() == 1
+    {
+        return 0f32;
+    }
+
+    let shanon_entropy_without_noise = possibilites_for_tiles[x][y]
+        .iter()
+        .map(|pattern_index| patterns[*pattern_index].probability)
+        .map(|probability| - probability * probability.log2())
+        .sum::<f32>();
+
+    shanon_entropy_without_noise - random_number_generator.gen_range(0f32..0.1) as f32
+}
+
+
+
 pub fn create_map(
     train_data: MultiVec<i32>,
     output_edge_length: usize,
     pattern_edge_length: usize,
-    seed: usize)
+    seed: u64)
 {
-    let patterns = slice_into_patterns(train_data, pattern_edge_length);
+    let random_number_generator = StdRng::seed_from_u64(seed);
+
+    let patterns = &slice_into_patterns(train_data, pattern_edge_length);
+    let pattern_indices = (0..patterns.len()).collect();
+    let rules_checker = &mut RulesChecker::new(patterns);
+    let possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>> = &mut Vec::new();
+
+    train_rules(patterns, pattern_edge_length, rules_checker);
+
+    initialize_possibilities_for_tiles(
+        output_edge_length,
+        pattern_indices,
+        possibilites_for_tiles);
 }

@@ -6,6 +6,8 @@ mod player;
 use bevy::prelude::*;
 #[cfg(debug_assertions)]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
+use crafting::CraftingPlugin;
+use progress::ProgressPlugin;
 
 use crate::player::PlayerPlugin;
 use crate::tile_world::TileWorldPlugin;
@@ -14,6 +16,8 @@ mod tile_world;
 mod multi_vec;
 mod wave_function_collapse_generator;
 mod object_interaction;
+mod progress;
+mod crafting;
 
 fn main() {
 
@@ -22,6 +26,8 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest())) // prevents blurry sprites
         .add_plugins(PlayerPlugin)
         .add_plugins(TileWorldPlugin)
+        .add_plugins(ProgressPlugin)
+        .add_plugins(CraftingPlugin)
         .add_plugins(object_interaction::ObjectInteractionPlugin);
     #[cfg(debug_assertions)]
     let builder = builder.add_plugins(WorldInspectorPlugin::new());

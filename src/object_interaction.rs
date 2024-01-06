@@ -2,9 +2,9 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb;
-use bevy::transform::commands;
 
 use crate::player::Player;
+use crate::progress::{self, DestroyProgress};
 use crate::tile_world::{GameObject, ObjectType};
 
 pub struct ObjectInteractionPlugin;
@@ -65,8 +65,12 @@ fn update(
     objects: Query<(Entity, &GameObject, &Transform)>,
     mut texts: Query<(&mut InteractText, &mut Text, &mut Visibility)>,
     mut key_evr: EventReader<KeyboardInput>,
+    time: Res<Time>,
+    progress_stuff: Res<progress::ProgressStuff>,
+    running_progress: Query<&DestroyProgress>,
 ) {
-    let player_transform = players.iter().next().expect("no player found").1;
+    let (_, player_transform) = players.iter_mut().next().expect("no player found");
+    let progress_running = running_progress.iter().next().is_some();
 
     let object = objects.iter().find(|(_, _, tile_transform)| collide_aabb::collide(
             tile_transform.translation,
@@ -78,7 +82,7 @@ fn update(
     let mut text = texts.iter_mut().next().expect("no text found");
 
     match object {
-        Some((_, object, _)) => {
+        Some((_, object, _)) if !progress_running => {
             let desc: String = match object.get_type() {
                 Some(ObjectType::Tree) => "cut down tree".to_string(),
                 Some(ObjectType::Ship) => "loot ship".to_string(),
@@ -88,34 +92,37 @@ fn update(
             text.1.sections[0].value = format!("[E] {}", desc);
             *text.2 = Visibility::Visible;
         },
-        None => {
+        _ => {
             *text.2 = Visibility::Hidden;
         }
     }
 
-    let mut player = players.iter_mut().next().expect("no player found").0;
-    let inventory = &mut player.inventory;
 
-    if let Some((entity, object, _)) = object { 
-        if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
+    if let Some((entity, object, transform)) = object { 
+        if !progress_running && key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
+            let mut progress = DestroyProgress {
+                target: entity,
+                others: vec![],
+                get_inv: default(),
+                start_time: time.elapsed_seconds(),
+                time_to_destroy: 2.0,
+            };
+
             match object.get_type() {
                 Some(ObjectType::Tree) => {
-                    inventory.wood += 10;
-                    println!("You have {} wood", inventory.wood);
+                    progress.get_inv.wood += 10;
                 },
                 Some(ObjectType::Ship) => {
-                    inventory.weapons += 10;
-                    println!("You have {} weapons", inventory.weapons);
+                    progress.get_inv.weapons += 10;
                 },
                 Some(ObjectType::Stone) => {
-                    inventory.stone += 10;
-                    println!("You have {} stone", inventory.stone);
+                    progress.get_inv.stone += 10;
                 },
                 None => {
                     error!("unimplemented: pick up {:?}", object);
                 }
             }
-            commands.entity(entity).despawn();
+            progress::start_destroy_progress(progress, &mut commands, progress_stuff, transform.translation.truncate())
         }
     }
 }
