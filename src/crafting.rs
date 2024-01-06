@@ -1,6 +1,11 @@
 use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
-use crate::{player::{Inventory, Player}, tile_world::{get_tile_at_pos, MapData, GameTile, TileType, create_bundle_for_tile, ObjectType, GameObject, TileAssets}, progress::{self, BuildProgress}};
+use crate::{
+    player::{Inventory, Player},
+    tile_world::{create_bundle_for_tile, ObjectType, GameObject, TileAssets},
+    progress::{self, BuildProgress},
+    game_tile::{GameTile, TileType, MapData},
+};
 
 
 pub struct CraftingPlugin;
@@ -124,7 +129,7 @@ fn update(
         let price = crafting_price(crafting_state.recipe);
         let Inventory { wood: wood_price, stone: stone_price, weapons: weapons_price } = price;
         if player.inventory.wood >= wood_price && player.inventory.stone >= stone_price && player.inventory.weapons >= weapons_price {
-            let (x, y, tile) = get_tile_at_pos(transform.translation.truncate(), &map_data, &tiles).expect("no tile found");
+            let (x, y, tile) = map_data.get_tile_at_pos(transform.translation.truncate(), &tiles).expect("no tile found");
             let has_water = tile.bottom_left_type() == Some(TileType::Water)
                 || tile.bottom_right_type() == Some(TileType::Water)
                 || tile.top_left_type() == Some(TileType::Water)

@@ -1,6 +1,11 @@
 use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 
-use crate::{player::{Player, Inventory}, crafting::Buildable, tile_world::{GameObject, TileType, create_bundle_for_tile, TileAssets, ObjectType}};
+use crate::{
+    player::{Player, Inventory}, 
+    crafting::Buildable, 
+    tile_world::{GameObject, create_bundle_for_tile, TileAssets, ObjectType},
+    game_tile::{TileType},
+};
 
 #[derive(Component)]
 pub struct DestroyProgress {
