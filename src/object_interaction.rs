@@ -2,7 +2,6 @@ use bevy::input::ButtonState;
 use bevy::input::keyboard::KeyboardInput;
 use bevy::prelude::*;
 use bevy::sprite::collide_aabb;
-use bevy::transform::commands;
 
 use crate::player::Player;
 use crate::progress::{self, DestroyProgress};
@@ -104,22 +103,20 @@ fn update(
             let mut progress = DestroyProgress {
                 target: entity,
                 others: vec![],
-                stone: 0,
-                wood: 0,
-                weapons: 0,
+                get_inv: default(),
                 start_time: time.elapsed_seconds(),
                 time_to_destroy: 2.0,
             };
 
             match object.get_type() {
                 Some(ObjectType::Tree) => {
-                    progress.wood += 10;
+                    progress.get_inv.wood += 10;
                 },
                 Some(ObjectType::Ship) => {
-                    progress.weapons += 10;
+                    progress.get_inv.weapons += 10;
                 },
                 Some(ObjectType::Stone) => {
-                    progress.stone += 10;
+                    progress.get_inv.stone += 10;
                 },
                 None => {
                     error!("unimplemented: pick up {:?}", object);

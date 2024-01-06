@@ -1,5 +1,6 @@
+use std::{ops::Add, fmt::Formatter, fmt::Display};
+
 use bevy::prelude::*;
-use bevy::input::keyboard::KeyboardInput;
 
 pub struct PlayerPlugin;
 
@@ -16,10 +17,26 @@ pub struct Player {
     pub inventory: Inventory,
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Inventory {
     pub wood: i32,
     pub stone: i32,
     pub weapons: i32,
+}
+impl Add for Inventory {
+    type Output = Inventory;
+    fn add(self, other: Inventory) -> Inventory {
+        Inventory {
+            wood: self.wood + other.wood,
+            stone: self.stone + other.stone,
+            weapons: self.weapons + other.weapons,
+        }
+    }
+}
+impl Display for Inventory {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Wood: {}, Stone: {}, Weapons: {}", self.wood, self.stone, self.weapons)
+    }
 }
 
 #[derive(Component)]
