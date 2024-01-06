@@ -12,11 +12,15 @@ impl Plugin for ObjectInteractionPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, startup);
         app.add_systems(Update, update);
+        app.add_systems(Update, update_inventory_text);
     }
 }
 
 #[derive(Component, Debug)]
 struct InteractText;
+
+#[derive(Component, Debug)]
+struct InventoryText;
 
 fn startup(mut commands: Commands) {
     commands.spawn((
@@ -35,6 +39,22 @@ fn startup(mut commands: Commands) {
         })
         .with_text_alignment(TextAlignment::Center),
         InteractText {},
+    ));
+    commands.spawn((
+        TextBundle::from_section(
+            "[empty inventory]",
+            TextStyle {
+                font_size: 20.0,
+                ..Default::default()
+            },
+        )
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(20.0),
+            left: Val::Px(20.0),
+            ..Default::default()
+        }),
+        InventoryText {},
     ));
 }
 
@@ -70,11 +90,11 @@ fn update(
         }
     }
 
+    let mut player = players.iter_mut().next().expect("no player found").0;
+    let inventory = &mut player.inventory;
+
     if let Some((object, _)) = object { 
         if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
-            let mut player = players.iter_mut().next().expect("no player found").0;
-            let inventory = &mut player.inventory;
-
             match object.get_type() {
                 Some(ObjectType::Tree) => {
                     inventory.wood += 10;
@@ -90,4 +110,13 @@ fn update(
             }
         }
     }
+}
+
+fn update_inventory_text(
+    mut inv_text: Query<(&mut InventoryText, &mut Text)>,
+    players: Query<&Player>) {
+
+    let player = players.iter().next().expect("no player found");
+    let mut inventory_text = inv_text.iter_mut().next().expect("no inventory text found");
+    inventory_text.1.sections[0].value = format!("Wood: {}\nStone: {}\nWeapons: {}", player.inventory.wood, player.inventory.stone, player.inventory.weapons);
 }
