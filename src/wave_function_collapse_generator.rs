@@ -257,17 +257,16 @@ fn is_finished(possibilites_for_tiles: &MultiVec<Vec<usize>>) -> bool
 fn get_shannon_entropy_for_tile(
     x: usize,
     y: usize,
-    possibilites_for_tiles: &MultiVec<Vec<usize>>,
+    possibilites_for_tile: &Vec<usize>,
     patterns: &Vec<Pattern>,
     random_number_generator: &mut StdRng) -> f32
 {
-    let possibilities = possibilites_for_tiles.get(x,y).unwrap();
-    if possibilities.len() == 1
+    if possibilites_for_tile.len() == 1
     {
         return 0f32;
     }
 
-    let shanon_entropy_without_noise = possibilities
+    let shanon_entropy_without_noise = possibilites_for_tile
         .iter()
         .map(|pattern_index| patterns[*pattern_index].probability)
         .map(|probability| - probability * probability.log2())
@@ -281,7 +280,9 @@ fn get_tile_position_with_minimal_entropy(
     possibilites_for_tiles: &MultiVec<Vec<usize>>,
     output_edge_length: usize,
     patterns: &Vec<Pattern>,
-    random_number_generator: &mut StdRng) -> Option<(usize, usize)>
+    random_number_generator: &mut StdRng,
+    entropy_for_tile: &MultiVec<f32>
+) -> Option<(usize, usize)>
 {
     let mut min_entropy = f32::MAX;
     let mut min_entropy_position = None;
@@ -290,7 +291,7 @@ fn get_tile_position_with_minimal_entropy(
     {
         for y in 0..output_edge_length
         {
-            let entropy = get_shannon_entropy_for_tile(x, y, possibilites_for_tiles, patterns, random_number_generator);
+            let entropy = *entropy_for_tile.get(x, y).unwrap();
 
             if entropy.abs() <= f32::EPSILON
             {
@@ -312,9 +313,11 @@ fn collapse_one_possibility(
     possibilites_for_tiles: &mut MultiVec<Vec<usize>>,
     output_edge_length: usize,
     patterns: &Vec<Pattern>,
-    random_number_generator: &mut StdRng) -> Option<(usize, usize)>
+    random_number_generator: &mut StdRng,
+    entropy_for_tile: &mut MultiVec<f32>
+) -> Option<(usize, usize)>
 {
-    let (tile_x, tile_y) = get_tile_position_with_minimal_entropy(possibilites_for_tiles, output_edge_length, patterns, random_number_generator)?;
+    let (tile_x, tile_y) = get_tile_position_with_minimal_entropy(possibilites_for_tiles, output_edge_length, patterns, random_number_generator, &entropy_for_tile)?;
     
     let possible_pattern_indices = possibilites_for_tiles.get(tile_x, tile_y)?;
     println!("We want to collapse {} {} to one possibility of {:?}", tile_x, tile_y, possible_pattern_indices);
@@ -346,6 +349,8 @@ fn collapse_one_possibility(
         .get_mut(tile_x, tile_y).expect("Unmöglicher Index");
     *possibilities_for_tile = vec![ chosen_pattern_index ];
 
+    *entropy_for_tile.get_mut(tile_x, tile_y).unwrap() = 0f32;
+
     Some((tile_x, tile_y))
 }
 
@@ -365,8 +370,11 @@ fn propagate_chosen_possibility(
     y_chosen_tile: usize,
     output_edge_length: usize,
     possibilites_for_tiles: &mut MultiVec<Vec<usize>>,
-    rules_checker: &RulesChecker)
-{
+    rules_checker: &RulesChecker,
+    entropy_per_tile: &mut MultiVec<f32>,
+    patterns: &Vec<Pattern>,
+    random_number_generator: &mut StdRng,
+) {
     println!("we are starting propagation. Behold the mysteries of the universe!");
     plot_possibilities(possibilites_for_tiles);
 
@@ -414,6 +422,14 @@ fn propagate_chosen_possibility(
 
             if has_changed && !already_handled.contains(&(next_x, next_y))
             {
+                *entropy_per_tile.get_mut(next_x, next_y).unwrap() = get_shannon_entropy_for_tile(
+                    next_x,
+                    next_y,
+                    possibilites_for_tiles.get(next_x, next_y).unwrap(),
+                    &patterns,
+                    random_number_generator,
+                );
+
                 work_queue.push_back((next_x, next_y));
                 already_handled.insert((next_x, next_y));
             }
@@ -501,6 +517,23 @@ pub fn create_map(
         &patterns,
         possibilities_for_tiles);
 
+    // init entropy cache data structure
+    let mut entropy_per_tile = MultiVec::<f32>::new(1e9, output_edge_length_with_space_for_patterns, output_edge_length_with_space_for_patterns);
+    for y in 0..output_edge_length_with_space_for_patterns
+    {
+        for x in 0..output_edge_length_with_space_for_patterns
+        {
+            *entropy_per_tile.get_mut(x, y).unwrap() = get_shannon_entropy_for_tile(
+                x,
+                y,
+                possibilities_for_tiles.get(x,y).unwrap(),
+                patterns,
+                &mut random_number_generator
+            );
+        }
+    }
+
+    
     while !is_finished(possibilities_for_tiles)
     {
         info!("collapse single pattern position...");
@@ -508,7 +541,9 @@ pub fn create_map(
             possibilities_for_tiles,
             output_edge_length_with_space_for_patterns,
             patterns,
-            &mut random_number_generator);
+            &mut random_number_generator,
+            &mut entropy_per_tile,
+        );
         
         match chosen_possibility {
             Some((x_chosen_tile, y_chosen_tile)) =>
@@ -520,7 +555,11 @@ pub fn create_map(
                     y_chosen_tile,
                     output_edge_length_with_space_for_patterns,
                     possibilities_for_tiles,
-                    rules_checker);
+                    rules_checker,
+                    &mut entropy_per_tile,
+                    patterns,
+                    &mut random_number_generator,
+                );
             },
             None =>
             {

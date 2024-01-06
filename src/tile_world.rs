@@ -261,8 +261,8 @@ fn generate_on_load_complete(
                 println!("layer {:?}: {:?}", layer.number, layer.name);
             }
 
-            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
-            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 0).unwrap();
+            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 2).unwrap();
+            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
 
             let min_tile = base_layer.tiles.iter()
                 .filter(|tile| tile.tile != -1)
