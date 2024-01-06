@@ -130,10 +130,20 @@ fn slice_into_patterns(
             {
                 for x in x_start..(x_start + pattern_size)
                 {
-                    match train_data.get(x, y) {
-                        Some(value) => pattern.flat_definition.push(*value),
-                        None => panic!("Böse :("),
-                    }
+                    let current_tile = train_data.get(x, y);
+
+                    match current_tile {
+                        Some(value) =>
+                        {
+                            if *value == -1
+                            {
+                                continue;
+                            }
+
+                            pattern.flat_definition.push(*value)
+                        },
+                        None => panic!("Fehler bei Slice"),
+                    };
                 }
             }
 
@@ -279,6 +289,70 @@ fn get_shannon_entropy_for_tile(
 }
 
 
+fn get_tile_position_with_minimal_entropy(
+    possibilites_for_tiles: &Vec<Vec<Vec<usize>>>,
+    output_edge_length: usize,
+    patterns: &Vec<Pattern>,
+    random_number_generator: &mut StdRng) -> Option<(usize, usize)>
+{
+    let mut min_entropy = f32::MAX;
+    let mut min_entropy_position = None;
+
+    for x in 0..output_edge_length
+    {
+        for y in 0..output_edge_length
+        {
+            let entropy = get_shannon_entropy_for_tile(x, y, possibilites_for_tiles, patterns, random_number_generator);
+
+            if entropy.abs() <= f32::EPSILON
+            {
+                continue;
+            }
+
+            if entropy < min_entropy
+            {
+                min_entropy = entropy;
+                min_entropy_position = Some((x, y));
+            }
+        }
+    }
+
+    min_entropy_position
+}
+
+fn choose_one_possibility(
+    possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>>,
+    output_edge_length: usize,
+    patterns: &Vec<Pattern>,
+    random_number_generator: &mut StdRng) -> Option<(usize, usize)>
+{
+    let (tile_x, tile_y) = get_tile_position_with_minimal_entropy(possibilites_for_tiles, output_edge_length, patterns, random_number_generator)?;
+
+    let possible_pattern_indices = &possibilites_for_tiles[tile_x][tile_y];
+
+    let highest_probability = possible_pattern_indices
+        .iter()
+        .map(|pattern_index| patterns[*pattern_index].probability)
+        .reduce(f32::max)?;
+
+    let possibilities_with_highest_probability: Vec<&usize> = possible_pattern_indices
+        .iter()
+        .filter(|pattern_index| (patterns[**pattern_index].probability - highest_probability).abs() <= f32::EPSILON)
+        .collect();
+
+    let chosen_possibility_index = random_number_generator.gen_range(0..possibilities_with_highest_probability.len());
+
+    let possibilities_for_tile = possibilites_for_tiles
+        .get_mut(tile_x)
+        .expect("Unmöglicher Index")
+        .get_mut(tile_y)
+        .expect("Unmöglicher Index");
+
+    possibilities_for_tile.clear();
+    possibilities_for_tile.push(chosen_possibility_index);
+
+    Some((tile_x, tile_y))
+}
 
 pub fn create_map(
     train_data: MultiVec<i32>,
