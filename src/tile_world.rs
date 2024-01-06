@@ -1,5 +1,4 @@
-use bevy::{prelude::*, asset::LoadState};use bevy::prelude::*;
-use bevy_inspector_egui::prelude::*;
+use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
@@ -12,7 +11,6 @@ impl Plugin for TileWorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(JsonAssetPlugin::<PyxelFile>::new(&["json"])); // register .json extension (example advises for *."map.json")
         app.add_systems(PreStartup, pre_setup);
-        // app.add_systems(Startup, setup);
         app.add_systems(PreUpdate, generate_on_load_complete);
         app.register_type::<GameObject>();
         app.register_type::<GameTile>();
