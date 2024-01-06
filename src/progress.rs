@@ -14,6 +14,7 @@ pub struct DestroyProgress {
 #[derive(Component)]
 pub struct BuildProgress {
     pub others: Vec<Entity>,
+    pub price_inv: Inventory,
     pub start_time: f32,
     pub time_to_build: f32,
     pub buildable: Buildable,
