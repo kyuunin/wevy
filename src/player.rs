@@ -12,12 +12,22 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Component)]
-pub struct Player;
+pub struct Player {
+    pub inventory: Inventory,
+}
+
+pub struct Inventory {
+    pub wood: i32,
+    pub stone: i32,
+    pub weapons: i32,
+}
 
 #[derive(Component)]
 struct AnimationIndices {
     first: usize,
     last: usize,
+    mirrored: bool,
+    walking: bool,
 }
 
 #[derive(Component, Deref, DerefMut)]
@@ -38,13 +48,20 @@ fn animate_sprite(
     //error!("something failed");
     for (indices, mut timer, mut sprite) in &mut query {
         timer.tick(time.delta());
-        if timer.just_finished() {
-            sprite.index = if sprite.index == indices.last {
-                indices.first
-            } else {
-                sprite.index + 1
-            };
+        if indices.walking {
+            if sprite.index < indices.first { sprite.index = indices.first } // immediately switch to walk anim when starting walking
+            if timer.just_finished() {
+                sprite.index = if sprite.index == indices.last {
+                    indices.first
+                } else {
+                    sprite.index + 1
+                };
+            } 
+        } else {
+            sprite.index = indices.first - 1; // sprite sheet contains standing frame before walking frames
+            timer.reset();
         }
+        sprite.flip_x = indices.mirrored;
     }
 }
 
@@ -58,7 +75,7 @@ fn setup(
         TextureAtlas::from_grid(texture_handle, Vec2::new(24.0, 24.0), 7, 1, None, None);
     let texture_atlas_handle = texture_atlases.add(texture_atlas);
     // Use only the subset of sprites in the sheet that make up the run animation
-    let animation_indices = AnimationIndices { first: 1, last: 6 };
+    let animation_indices = AnimationIndices { first: 1, last: 6, mirrored: false, walking: false };
 
     let player_size = 0.6 / 32.0;
     let camera_scale = 0.007;
@@ -77,7 +94,7 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player,
+        Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 } },
         Name::new("Player"),
         
     )).id();
@@ -88,30 +105,32 @@ fn setup(
 
 fn keyboard_events(
     // mut key_evr: EventReader<KeyboardInput>,
-    mut players: Query<(&AnimationTimer, &mut Transform)>,
+    mut players: Query<(&mut AnimationIndices, &mut Transform)>,
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
 ) {
     let speed: f32 = 1.0;
+    
+    let (mut indices, mut transform) = players.iter_mut().next().expect("No player found");
+
+    indices.walking = false;
     if input.pressed(KeyCode::W) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.y += speed * time.delta_seconds();
-        }
+        transform.translation.y += speed * time.delta_seconds();
+        indices.walking = true;
     }
     if input.pressed(KeyCode::S) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.y -= speed * time.delta_seconds();
-        }
+        transform.translation.y -= speed * time.delta_seconds();
+        indices.walking = true;
     }
     if input.pressed(KeyCode::A) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.x -= speed * time.delta_seconds();
-        }
+        transform.translation.x -= speed * time.delta_seconds();
+        indices.mirrored = true;
+        indices.walking = true;
     }
     if input.pressed(KeyCode::D) {
-        for (_, mut transform) in &mut players.iter_mut() {
-            transform.translation.x += speed * time.delta_seconds();
-        }
+        transform.translation.x += speed * time.delta_seconds();
+        indices.mirrored = false;
+        indices.walking = true;
     }
 
     // use bevy::input::ButtonState;

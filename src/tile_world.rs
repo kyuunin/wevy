@@ -1,4 +1,5 @@
-use bevy::{prelude::*, asset::LoadState};
+use bevy::{prelude::*, asset::LoadState};use bevy::prelude::*;
+use bevy_inspector_egui::prelude::*;
 use bevy_common_assets::json::JsonAssetPlugin;
 use serde::Deserialize;
 use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
@@ -13,18 +14,61 @@ impl Plugin for TileWorldPlugin {
         app.add_systems(PreStartup, pre_setup);
         // app.add_systems(Startup, setup);
         app.add_systems(PreUpdate, generate_on_load_complete);
+        app.register_type::<GameObject>();
+        app.register_type::<GameTile>();
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
 
-#[derive(Component, Debug)]
+pub enum TileType {
+    Water, Field, Mountain,
+}
+
+pub enum ObjectType {
+    Tree, Ship,
+}
+
+#[derive(Component, Debug, Reflect)]
 pub struct GameObject {
     tile_id: i32,
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Reflect)]
 pub struct GameTile {
     tile_id: i32,
+}
+
+impl GameObject {
+    pub fn get_type(&self) -> Option<ObjectType> {
+        use ObjectType::*;
+        match self.tile_id {
+            12 => Some(Tree),
+            13 => Some(Ship),
+            _  => None,
+        }
+    }
+}
+
+impl GameTile {
+    pub fn top_left_type(&self) -> Option<TileType> {
+        use TileType::*;
+        match self.tile_id {
+             0| 1| 2| 3| 8|11|15                   => Some(Water),
+             4| 5| 6| 7| 9|10|14|16|17|18|19|24|31 => Some(Field),
+            20|21|22|23|25|26|30                   => Some(Mountain),
+            _                                      => None,
+        }
+    }
+    
+    pub fn top_right_type(&self) -> Option<TileType> {
+        use TileType::*;
+        match self.tile_id {
+             0| 1| 2| 5|10|11|14                   => Some(Water),
+             3| 4| 6| 7| 9| 8|15|16|17|18|21|26|30 => Some(Field),
+            19|20|22|23|24|25|31                   => Some(Mountain),
+            _                                      => None,
+        }
+    }
 }
 
 #[derive(Deserialize, Asset, TypePath)]
