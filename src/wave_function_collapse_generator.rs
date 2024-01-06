@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Index};
 
 use enum_iterator::{Sequence, all};
 use rand::{rngs::StdRng, SeedableRng, Rng};
@@ -103,7 +103,7 @@ impl RulesChecker
         possible_patterns.push(next_pattern_index);
     }
 
-    pub fn check_if_pattern_is_allowed(self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize) -> bool
+    pub fn check_if_pattern_is_allowed(&self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize) -> bool
     {
         self.rules[&current_pattern_index][&direction].contains(&next_pattern_index)
     }
@@ -176,18 +176,18 @@ fn slice_into_patterns(
     patterns
 }
 
-fn get_valid_directions(x: i32, y: i32, output_length: usize) -> Vec<Direction>
+fn get_valid_directions(x: i32, y: i32, output_edge_length: usize) -> Vec<Direction>
 {
     match (x, y)
     {
         (0, 0) => vec! [ Direction::Right, Direction::Down, Direction::DownRight ],
-        (0, y) if y == output_length as i32 - 1 => vec! [ Direction::Right, Direction::Up, Direction::UpRight ],
+        (0, y) if y == output_edge_length as i32 - 1 => vec! [ Direction::Right, Direction::Up, Direction::UpRight ],
         (0, _) => vec! [ Direction::Right, Direction::Down, Direction::DownRight, Direction::Up, Direction::UpRight ],
-        (x, 0) if x == output_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft ],
-        (x, y) if x == output_length as i32 -1 && y == output_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft, Direction::Up, Direction::UpLeft ],
-        (x, _) if x == output_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft, Direction::Up, Direction::UpLeft ],
+        (x, 0) if x == output_edge_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft ],
+        (x, y) if x == output_edge_length as i32 -1 && y == output_edge_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft, Direction::Up, Direction::UpLeft ],
+        (x, _) if x == output_edge_length as i32 -1 => vec! [ Direction::Left, Direction::Down, Direction::DownLeft, Direction::Up, Direction::UpLeft ],
         (_, 0) => vec! [ Direction::Left, Direction::Right, Direction::Down, Direction::DownLeft, Direction::DownRight ],
-        (_, y) if y == output_length as i32 -1 => vec! [ Direction::Left, Direction::Right, Direction::Up, Direction::UpLeft, Direction::UpRight ],
+        (_, y) if y == output_edge_length as i32 -1 => vec! [ Direction::Left, Direction::Right, Direction::Up, Direction::UpLeft, Direction::UpRight ],
         (_, _) => vec! [ Direction::Left, Direction::Up, Direction::UpLeft, Direction::UpRight, Direction::Down, Direction::DownLeft, Direction::DownRight ],
     }
 }
@@ -354,23 +354,122 @@ fn choose_one_possibility(
     Some((tile_x, tile_y))
 }
 
+fn propagate_chosen_possibility(
+    x_chosen_tile: usize,
+    y_chosen_tile: usize,
+    output_edge_length: usize,
+    possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>>,
+    rules_checker: &RulesChecker) -> Option<()>
+{
+    let mut missing_propagations = Vec::<(usize, usize)>::new();
+
+    loop {
+        let (x_current_tile, y_current_tile)  = missing_propagations.pop()?;
+
+        for direction in get_valid_directions(x_current_tile as i32, y_current_tile as i32, output_edge_length)
+        {
+            let direction_as_tuple: (i32, i32) = direction.into();
+
+            let (next_x, next_y) = ((x_current_tile as i32 + direction_as_tuple.0) as usize, (y_current_tile as i32 + direction_as_tuple.1) as usize);
+
+            let mut possible_next_patterns = possibilites_for_tiles
+                .get_mut(next_x)
+                .expect("next_x is not in possible tiles!")
+                .get_mut(next_y)
+                .expect("next_y is not in possible tiles!");
+
+            let mut updated_possible_next_patterns: Vec<usize> = possible_next_patterns
+                .iter()
+                .filter(|possible_next_pattern| possible_next_patterns.iter().any(|afterwards_possible_next_pattern| rules_checker.check_if_pattern_is_allowed(
+                    **possible_next_pattern,
+                    direction,
+                    *afterwards_possible_next_pattern)))
+                .map(|pattern_index| *pattern_index)
+                .collect();
+
+            possible_next_patterns.clear();
+
+            possible_next_patterns.append(&mut updated_possible_next_patterns);
+        }
+    }
+}
+
+fn create_output_tiles(
+    possibilites_for_tiles: &Vec<Vec<Vec<usize>>>,
+    patterns: &Vec<Pattern>,
+    output_edge_length: usize,
+    output_edge_length_with_space_for_patterns: usize,
+    pattern_edge_length: usize) -> MultiVec<i32>
+{
+    let mut output_tiles = MultiVec::new(-1, output_edge_length, output_edge_length);
+
+    for x in 0..output_edge_length_with_space_for_patterns
+    {
+        for y in 0..output_edge_length_with_space_for_patterns
+        {
+            let chosen_pattern_index = possibilites_for_tiles[x][y].first().expect("No possibility left");
+
+            let chosen_pattern = &patterns[*chosen_pattern_index];
+
+            for flat_pattern_index in 0..chosen_pattern.flat_definition.len()
+            {
+                let output_tile = output_tiles
+                    .get_mut(x + flat_pattern_index % pattern_edge_length, y + flat_pattern_index / pattern_edge_length)
+                    .expect("Out of bound in output tiles");
+
+                *output_tile = chosen_pattern.flat_definition[flat_pattern_index];
+            }
+        }
+    }
+
+    output_tiles
+}
+
 pub fn create_map(
     train_data: MultiVec<i32>,
     output_edge_length: usize,
     pattern_edge_length: usize,
-    seed: u64)
+    seed: u64) -> MultiVec<i32>
 {
-    let random_number_generator = StdRng::seed_from_u64(seed);
+    let mut random_number_generator = StdRng::seed_from_u64(seed);
 
     let patterns = &slice_into_patterns(train_data, pattern_edge_length);
     let pattern_indices = (0..patterns.len()).collect();
     let rules_checker = &mut RulesChecker::new(patterns);
     let possibilites_for_tiles: &mut Vec<Vec<Vec<usize>>> = &mut Vec::new();
 
+    let output_edge_length_with_space_for_patterns = output_edge_length - pattern_edge_length * pattern_edge_length;
+
     train_rules(patterns, pattern_edge_length, rules_checker);
 
     initialize_possibilities_for_tiles(
-        output_edge_length,
+        output_edge_length_with_space_for_patterns,
         pattern_indices,
         possibilites_for_tiles);
+
+    while !is_finished(possibilites_for_tiles)
+    {
+        let chosen_possibility = choose_one_possibility(
+            possibilites_for_tiles,
+            output_edge_length_with_space_for_patterns,
+            patterns,
+            &mut random_number_generator);
+
+        match chosen_possibility {
+            Some((x_chosen_tile, y_chosen_tile)) =>
+            {
+                propagate_chosen_possibility(
+                    x_chosen_tile,
+                    y_chosen_tile,
+                    output_edge_length_with_space_for_patterns,
+                    possibilites_for_tiles,
+                    rules_checker);
+            },
+            None => {
+                return create_output_tiles(possibilites_for_tiles, patterns, output_edge_length, output_edge_length_with_space_for_patterns, pattern_edge_length);
+            },
+        }
+    }
+
+    return create_output_tiles(possibilites_for_tiles, patterns, output_edge_length, output_edge_length_with_space_for_patterns, pattern_edge_length);
 }
