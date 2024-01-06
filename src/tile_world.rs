@@ -24,14 +24,26 @@ impl Plugin for TileWorldPlugin {
 #[derive(Default, Resource)]
 pub struct MapData(MultiVec<Option<Entity>>);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TileType {
     Water, Field, Mountain,
 }
 
 #[derive(Debug)]
 pub enum ObjectType {
-    Tree, Ship, Stone
+    Tree, Ship, Stone, Campfire
+}
+
+impl From<ObjectType> for GameObject {
+    fn from(object_type: ObjectType) -> Self {
+        use ObjectType::*;
+        match object_type {
+            Tree => GameObject { tile_id: 12 },
+            Ship => GameObject { tile_id: 13 },
+            Stone => GameObject { tile_id: 27 },
+            Campfire => GameObject { tile_id: 29 },
+        }
+    }
 }
 
 #[derive(Component, Debug, Reflect)]
@@ -51,6 +63,7 @@ impl GameObject {
             12 => Some(Tree),
             13 => Some(Ship),
             27 => Some(Stone),
+            29 => Some(Campfire),
             _  => None,
         }
     }

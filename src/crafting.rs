@@ -1,6 +1,6 @@
 use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
-use crate::player::{Inventory, Player};
+use crate::{player::{Inventory, Player}, tile_world::{get_tile_at_pos, MapData, GameTile, TileType}};
 
 
 pub struct CraftingPlugin;
@@ -82,7 +82,9 @@ fn update(
     mut recipe_texts: Query<(&mut RecipeText, &mut Text)>,
     mut crafting_state: ResMut<CraftingState>,
     mut key_evr: EventReader<KeyboardInput>,
-    mut players: Query<&mut Player>,
+    mut players: Query<(&mut Player, &Transform)>,
+    map_data: Res<MapData>,
+    tiles: Query<&GameTile>,
 ) {
     let mut recipe_text = recipe_texts.iter_mut().next().expect("no recipe text found");
     recipe_text.1.sections[0].value = format!("[R] to build {} ({})", crafting_name(crafting_state.recipe), crafting_price(crafting_state.recipe).to_string());
@@ -92,7 +94,7 @@ fn update(
     // Cheats: Number keys add resources
     #[cfg(debug_assertions)]
     {
-        let mut player = players.iter_mut().next().expect("no player found");
+        let (mut player, _) = players.iter_mut().next().expect("no player found");
         if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Key1)) {
             player.inventory.wood += 10;
         }
@@ -113,24 +115,40 @@ fn update(
     }
 
     if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::R)) {
-        let mut player = players.iter_mut().next().expect("no player found");
+        let (mut player, transform) = players.iter_mut().next().expect("no player found");
         let price = crafting_price(crafting_state.recipe);
         let Inventory { wood: wood_price, stone: stone_price, weapons: weapons_price } = price;
         if player.inventory.wood >= wood_price && player.inventory.stone >= stone_price && player.inventory.weapons >= weapons_price {
-            player.inventory -= price;
-            info!("Built {}", crafting_name(crafting_state.recipe));
+            let (_, tile) = get_tile_at_pos(transform.translation.truncate(), map_data, tiles).expect("no tile found");
+            let has_water = tile.bottom_left_type() == Some(TileType::Water)
+                || tile.bottom_right_type() == Some(TileType::Water)
+                || tile.top_left_type() == Some(TileType::Water)
+                || tile.top_right_type() == Some(TileType::Water);
+            let has_land = tile.bottom_left_type() == Some(TileType::Field)
+                || tile.bottom_right_type() == Some(TileType::Field)
+                || tile.top_left_type() == Some(TileType::Field)
+                || tile.top_right_type() == Some(TileType::Field);
 
-            match crafting_state.recipe {
+            let spawned_entity: Option<Entity> = match crafting_state.recipe {
                 Buildable::Ship => {
                     todo!("implement ship")
                 },
                 Buildable::Campfire => {
-                    info!("You can now cook meat on the campfire");
-
+                    if has_land {
+                        info!("You can now cook meat on the campfire");
+                        todo!()
+                    } else {
+                        info!("You can only build a campfire on land");
+                        None
+                    }
                 },
                 Buildable::House => {
-                    todo!("implement house")
+                    todo!("implement house");
                 },
+            };
+            if let Some(_) = spawned_entity {
+                player.inventory -= price;
+                info!("Built {}", crafting_name(crafting_state.recipe));
             }
         } else {
             info!("Not enough resources to build {}", crafting_name(crafting_state.recipe));
