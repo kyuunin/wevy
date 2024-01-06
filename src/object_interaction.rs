@@ -81,49 +81,47 @@ fn update(
 
     let mut text = texts.iter_mut().next().expect("no text found");
 
-    match object {
-        Some((_, object, _)) if !progress_running => {
-            let desc: String = match object.get_type() {
-                Some(ObjectType::Tree) => "cut down tree".to_string(),
-                Some(ObjectType::Ship) => "loot ship".to_string(),
-                Some(ObjectType::Stone) => "mine stone".to_string(),
-                None => format!("[TEXT MISSING TO PICK UP {:?}", object),
-            };
-            text.1.sections[0].value = format!("[E] {}", desc);
-            *text.2 = Visibility::Visible;
-        },
-        _ => {
-            *text.2 = Visibility::Hidden;
-        }
+    // show text to player
+    let desc = object
+        .and_then(|(_, object, _)| { match object.get_type() {
+            Some(ObjectType::Tree) => Some("cut down tree"),
+            Some(ObjectType::Ship) => Some("loot ship"),
+            Some(ObjectType::Stone) => Some("mine stone"),
+            Some(ObjectType::Campfire) => None,
+            None => None,
+        }})
+        .map(|desc| format!("[E] {}", desc));
+    if let Some(desc) = desc {
+        text.1.sections[0].value = desc;
+        *text.2 = Visibility::Visible;
+    } else {
+        *text.2 = Visibility::Hidden;
     }
 
-
-    if let Some((entity, object, transform)) = object { 
-        if !progress_running && key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) {
-            let mut progress = DestroyProgress {
+    // handle key press: start destroy progress
+    if let Some((entity, object, transform)) = object  {
+        if !progress_running { Some(()) } else { None }
+            .and(if key_evr.read().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::E)) { Some(()) } else { None })
+            .and(Some(DestroyProgress {
                 target: entity,
                 others: vec![],
                 get_inv: default(),
                 start_time: time.elapsed_seconds(),
                 time_to_destroy: 2.0,
-            };
-
-            match object.get_type() {
-                Some(ObjectType::Tree) => {
-                    progress.get_inv.wood += 10;
-                },
-                Some(ObjectType::Ship) => {
-                    progress.get_inv.weapons += 10;
-                },
-                Some(ObjectType::Stone) => {
-                    progress.get_inv.stone += 10;
-                },
-                None => {
-                    error!("unimplemented: pick up {:?}", object);
+            }))
+            .and_then(|mut progress| {
+                match object.get_type() {
+                    Some(ObjectType::Tree) => progress.get_inv.wood += 10,
+                    Some(ObjectType::Ship) => progress.get_inv.weapons += 10,
+                    Some(ObjectType::Stone) => progress.get_inv.stone += 10,
+                    Some(ObjectType::Campfire) => return None,
+                    None => return None,
                 }
-            }
-            progress::start_destroy_progress(progress, &mut commands, progress_stuff, transform.translation.truncate())
-        }
+                Some(progress)
+            })
+            .map(|progress| {
+                progress::start_destroy_progress(progress, &mut commands, progress_stuff, transform.translation.truncate())
+            });
     }
 }
 
