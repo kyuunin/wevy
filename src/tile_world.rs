@@ -5,6 +5,7 @@ use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
 use rand::prelude::*;
 
 use crate::multi_vec::MultiVec;
+use crate::player::Player;
 
 pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
@@ -132,15 +133,19 @@ struct TileAssets {
 
 fn test(
     map_data: Res<MapData>,
-    tiles: Query<&GameTile>
+    tiles: Query<&GameTile>,
+    mut players: Query<(&mut Player, &Transform)>,
 ) {
 
-    // let Some(entity) = map_data.as_ref().0.get(10,10) else {
-    //     warn!("couldn't find entity");
-    //     return;
-    // };
-    // let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
-    // println!("{:?}",tile.top_left_type())
+    let Vec3{x,y,..} = players.iter().next().expect("no player found").1.translation;
+    let x_pos = x.round() as usize;
+    let y_pos = y.round() as usize;
+    let Some(entity) = map_data.as_ref().0.get(x_pos, y_pos) else {
+        warn!("couldn't find entity");
+        return;
+    };
+    let tile: &GameTile = tiles.get_component(entity.expect("Field is empty")).expect("couldn't get component");
+    println!("{x_pos},{y_pos} = {:?}",tile.top_left_type())
         
 }
 
