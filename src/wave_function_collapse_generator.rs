@@ -600,6 +600,7 @@ pub fn create_map(
                 info!("Pattern at {x_chosen_tile},{y_chosen_tile} was collapsed");
                 info!("propagate possibilites...");
                 work_queue.clear();
+                already_handled.clear();
                 propagate_chosen_possibility(
                     x_chosen_tile,
                     y_chosen_tile,
