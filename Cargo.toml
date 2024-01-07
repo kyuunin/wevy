@@ -10,6 +10,8 @@ bevy = { version = "0.12.1" }
 bevy-inspector-egui = "0.22.1"
 bevy_common_assets = { version = "0.8.0", features = ["json"] }
 bevy_egui = "0.24.0"
+bit-set = "0.5.3"
+bitset = "0.1.2"
 derive_more = "0.99.17"
 enum-iterator = "1.4.1"
 rand = "0.8.5"
