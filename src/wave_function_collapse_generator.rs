@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet, VecDeque}, thread::current};
+use std::collections::{HashSet, VecDeque};
 
 use bevy::log::info;
 use enum_iterator::{Sequence, all};
@@ -115,7 +115,7 @@ struct RulesChecker
 
 impl RulesChecker
 {
-    pub fn new(patterns: &Vec<Pattern>) -> Self
+    pub fn new() -> Self
     {
         Self
         {
@@ -402,11 +402,11 @@ fn propagate_chosen_possibility(
     entropy_per_tile: &mut MultiVec<f32>,
     patterns: &Vec<Pattern>,
     random_number_generator: &mut StdRng,
+    work_queue: &mut VecDeque<(usize, usize)>,
 ) {
     println!("we are starting propagation. Behold the mysteries of the universe!");
     plot_possibilities(possibilites_for_tiles);
 
-    let mut work_queue = VecDeque::<(usize, usize)>::new();
     let mut already_handled = HashSet::<(usize,usize)>::new();
     
     work_queue.push_back((x_chosen_tile, y_chosen_tile));
@@ -416,7 +416,7 @@ fn propagate_chosen_possibility(
 
     while let Some((x_current_tile, y_current_tile)) = work_queue.pop_front() 
     {
-        let possible_current_patterns = possibilites_for_tiles.get(x_current_tile, y_current_tile).unwrap().clone();
+        let (possible_current_patterns, mut rest_list) = possibilites_for_tiles.isolate(x_current_tile, y_current_tile).unwrap();
 
         // println!("Filter neighbors of {} {}", x_current_tile, y_current_tile);
 
@@ -425,7 +425,7 @@ fn propagate_chosen_possibility(
             let direction_as_tuple: (i32, i32) = direction.into();
 
             let (next_x, next_y) = ((x_current_tile as i32 + direction_as_tuple.0) as usize, (y_current_tile as i32 + direction_as_tuple.1) as usize);
-            let possible_next_patterns = possibilites_for_tiles.get_mut(next_x, next_y).expect("next_xy is not in possible tiles!");
+            let possible_next_patterns = rest_list.get_mut(next_x, next_y).expect("next_xy is not in possible tiles!");
 
             let before_len = possible_next_patterns.len();
 
@@ -531,7 +531,7 @@ pub fn create_map(
     let patterns = &slice_into_patterns(train_data, pattern_edge_length);
 
     info!("train rules with top secret ultra complex algorithm");
-    let rules_checker = &mut RulesChecker::new(patterns);
+    let rules_checker = &mut RulesChecker::new();
     train_rules(patterns, pattern_edge_length, rules_checker);
     
     // Print all Rules (very big output)
@@ -580,6 +580,7 @@ pub fn create_map(
         }
     }
 
+    let mut work_queue = VecDeque::<(usize, usize)>::new();
     
     while !is_finished(possibilities_for_tiles)
     {
@@ -597,6 +598,7 @@ pub fn create_map(
             {
                 info!("Pattern at {x_chosen_tile},{y_chosen_tile} was collapsed");
                 info!("propagate possibilites...");
+                work_queue.clear();
                 propagate_chosen_possibility(
                     x_chosen_tile,
                     y_chosen_tile,
@@ -606,6 +608,7 @@ pub fn create_map(
                     &mut entropy_per_tile,
                     patterns,
                     &mut random_number_generator,
+                    &mut work_queue,
                 );
             },
             None =>
