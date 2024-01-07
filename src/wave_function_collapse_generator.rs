@@ -312,9 +312,9 @@ fn get_tile_position_with_minimal_entropy(
     let mut min_entropy = f32::MAX;
     let mut min_entropy_position = None;
 
-    for x in 0..output_edge_length
+    for y in 0..output_edge_length
     {
-        for y in 0..output_edge_length
+        for x in 0..output_edge_length
         {
             let entropy = *entropy_for_tile.get(x, y).unwrap();
 
@@ -403,11 +403,11 @@ fn propagate_chosen_possibility(
     patterns: &Vec<Pattern>,
     random_number_generator: &mut StdRng,
     work_queue: &mut VecDeque<(usize, usize)>,
+    already_handled: &mut HashSet<(usize, usize)>,
 ) {
     println!("we are starting propagation. Behold the mysteries of the universe!");
     plot_possibilities(possibilites_for_tiles);
 
-    let mut already_handled = HashSet::<(usize,usize)>::new();
     
     work_queue.push_back((x_chosen_tile, y_chosen_tile));
     already_handled.insert((x_chosen_tile, y_chosen_tile));
@@ -581,6 +581,7 @@ pub fn create_map(
     }
 
     let mut work_queue = VecDeque::<(usize, usize)>::new();
+    let mut already_handled = HashSet::<(usize,usize)>::new();
     
     while !is_finished(possibilities_for_tiles)
     {
@@ -609,6 +610,7 @@ pub fn create_map(
                     patterns,
                     &mut random_number_generator,
                     &mut work_queue,
+                    &mut already_handled,
                 );
             },
             None =>
