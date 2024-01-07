@@ -1,6 +1,6 @@
 use std::collections::{HashSet, VecDeque};
 
-use bevy::log::info;
+use bevy::{log::info, utils::HashMap};
 use enum_iterator::{Sequence, all};
 use rand::{rngs::StdRng, SeedableRng, Rng};
 use bit_set::BitSet;
@@ -110,7 +110,7 @@ impl Possibilities
 
 struct RulesChecker
 {
-    rules: HashSet<(usize, Direction, usize)>,
+    rules: HashMap<(usize, Direction), BitSet>,
 }
 
 impl RulesChecker
@@ -119,18 +119,22 @@ impl RulesChecker
     {
         Self
         {
-            rules: HashSet::new(),
+            rules: HashMap::new(),
         }
     }
 
     pub fn add_rule(&mut self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize)
     {
-        self.rules.insert((current_pattern_index, direction, next_pattern_index));
+        if !self.rules.contains_key(&(current_pattern_index, direction))
+        {
+            self.rules.insert((current_pattern_index, direction), BitSet::new());
+        }
+        self.rules.get_mut(&(current_pattern_index, direction)).unwrap().insert(next_pattern_index);
     }
 
-    pub fn check_if_pattern_is_allowed(&self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize) -> bool
+    pub fn get_possible_patterns(&self, current_pattern_index: usize, direction: Direction) -> &BitSet
     {
-        self.rules.contains(&(current_pattern_index, direction, next_pattern_index))
+        self.rules.get(&(current_pattern_index, direction)).unwrap()
     }
 }
 
@@ -429,23 +433,12 @@ fn propagate_chosen_possibility(
 
             let before_len = possible_next_patterns.len();
 
-            let mut new_next_patterns = possible_next_patterns.clone();
-            for pattern_index in possible_next_patterns.iter()
+            let mut has_valid_current_pattern = BitSet::new();
+            for current_pattern_index in possible_current_patterns.iter()
             {
-                let is_valid = possible_current_patterns
-                    .iter()
-                    .any(|current_pattern_to_check| rules_checker.check_if_pattern_is_allowed(
-                        current_pattern_to_check,
-                        direction,
-                        pattern_index));
-                
-                if !is_valid
-                {
-                    new_next_patterns.remove(pattern_index);
-                }
-
+                has_valid_current_pattern.union_with(rules_checker.get_possible_patterns(current_pattern_index, direction));
             }
-            *possible_next_patterns = new_next_patterns;
+            possible_next_patterns.bits.intersect_with(&has_valid_current_pattern);
 
             let after_len = possible_next_patterns.len();
 
