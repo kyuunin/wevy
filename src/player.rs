@@ -1,7 +1,14 @@
 use std::{fmt::Formatter, fmt::Display};
 use derive_more::{Add, Sub, AddAssign, SubAssign};
-
+use std::ops::Not;
 use bevy::prelude::*;
+use crate::{
+    game_tile::{
+        MapData,
+        GameTile,
+    },
+    tile_world::check_collision,
+};
 
 pub struct PlayerPlugin;
 
@@ -16,6 +23,7 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 pub struct Player {
     pub inventory: Inventory,
+    pub ghost: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Add, Sub, AddAssign, SubAssign)]
@@ -109,7 +117,7 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 } },
+        Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 }, ghost: false, },
         Name::new("Player"),
         
     )).id();
@@ -120,34 +128,60 @@ fn setup(
 
 fn keyboard_events(
     // mut key_evr: EventReader<KeyboardInput>,
-    mut players: Query<(&mut AnimationIndices, &mut Transform)>,
     input: Res<Input<KeyCode>>,
     time: Res<Time>,
+    map_data: Res<MapData>,
+    tiles: Query<&GameTile>,
+    mut players: Query<(&mut Player, &mut AnimationIndices, &mut Transform)>,
 ) {
     let speed: f32 = 1.0;
     
-    let (mut indices, mut transform) = players.iter_mut().next().expect("No player found");
-
+    let (mut player, mut indices, mut player_transform) = players.iter_mut().next().expect("No player found");
+    let mut transform = *player_transform;
     indices.walking = false;
     if input.pressed(KeyCode::W) {
         transform.translation.y += speed * time.delta_seconds();
-        indices.walking = true;
+        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+            transform = *player_transform;
+        } else {
+            *player_transform = transform;
+            indices.walking = true;
+        }
     }
     if input.pressed(KeyCode::S) {
         transform.translation.y -= speed * time.delta_seconds();
-        indices.walking = true;
+        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+            transform = *player_transform;
+        } else {
+            *player_transform = transform;
+            indices.walking = true;
+        }
     }
     if input.pressed(KeyCode::A) {
         transform.translation.x -= speed * time.delta_seconds();
         indices.mirrored = true;
-        indices.walking = true;
+        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+            transform = *player_transform;
+        } else {
+            *player_transform = transform;
+            indices.walking = true;
+        }
     }
     if input.pressed(KeyCode::D) {
         transform.translation.x += speed * time.delta_seconds();
         indices.mirrored = false;
-        indices.walking = true;
+        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+        } else {
+            *player_transform = transform;
+            indices.walking = true;
+        }
     }
-
+    if input.pressed(KeyCode::X) {
+        player.ghost = true;
+    }
+    if input.pressed(KeyCode::Y) {
+        player.ghost = false;
+    }
     // use bevy::input::ButtonState;
     // for ev in key_evr.read() {
     //     match ev.state {

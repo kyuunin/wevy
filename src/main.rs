@@ -1,7 +1,8 @@
 //! Renders an animated sprite by loading all animation frames from a single image (a sprite sheet)
 //! into a texture atlas, and changing the displayed image periodically.
 mod player;
-
+mod game_tile;
+mod game_object;
 
 use bevy::prelude::*;
 #[cfg(debug_assertions)]

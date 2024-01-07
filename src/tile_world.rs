@@ -1,113 +1,34 @@
 use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
+use std::ops::Not;
 use serde::Deserialize;
-use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
+use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
 use rand::prelude::*;
 use bevy::sprite::collide_aabb;
-use crate::{multi_vec::MultiVec, wave_function_collapse_generator::{self, create_map}};
-use crate::player::Player;
+
+use crate::{
+    multi_vec::MultiVec,
+    game_tile::{
+        MapData,
+        GameTile,
+        TileType,
+    },
+    game_object::{GameObject},
+};
+#[cfg(not(debug_assertions))]
+use crate::wave_function_collapse_generator::{self, create_map};
 
 pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(JsonAssetPlugin::<PyxelFile>::new(&["json"])); // register .json extension (example advises for *."map.json")
         app.add_systems(PreStartup, pre_setup);
-        app.add_systems(Update, test);
         app.add_systems(PreUpdate, generate_on_load_complete);
         app.register_type::<GameObject>();
         app.register_type::<GameTile>();
         app.init_resource::<MapData>();
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
-}
-
-#[derive(Default, Resource)]
-pub struct MapData(MultiVec<Option<Entity>>);
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum TileType {
-    Water, Field, Mountain,
-}
-
-#[derive(Debug, Copy, Clone)]
-pub enum ObjectType {
-    Tree, Ship, Stone, Campfire
-}
-
-impl From<ObjectType> for GameObject {
-    fn from(object_type: ObjectType) -> Self {
-        use ObjectType::*;
-        match object_type {
-            Tree => GameObject { tile_id: 12 },
-            Ship => GameObject { tile_id: 13 },
-            Stone => GameObject { tile_id: 27 },
-            Campfire => GameObject { tile_id: 29 },
-        }
-    }
-}
-
-#[derive(Component, Debug, Reflect, Copy, Clone)]
-pub struct GameObject {
-    pub tile_id: i32,
-}
-
-#[derive(Component, Debug, Reflect, Clone, Copy)]
-pub struct GameTile {
-    pub tile_id: i32,
-}
-
-impl GameObject {
-    pub fn get_type(&self) -> Option<ObjectType> {
-        use ObjectType::*;
-        match self.tile_id {
-            12 => Some(Tree),
-            13 => Some(Ship),
-            27 => Some(Stone),
-            29 => Some(Campfire),
-            _  => None,
-        }
-    }
-}
-
-impl GameTile {
-    pub fn top_left_type(&self) -> Option<TileType> {
-        use TileType::*;
-        match self.tile_id {
-             0| 1| 2| 3| 8|11|15                   => Some(Water),
-             4| 5| 6| 7| 9|10|14|16|17|18|19|24|31 => Some(Field),
-            20|21|22|23|25|26|30                   => Some(Mountain),
-            _                                      => None,
-        }
-    }
-    
-    pub fn top_right_type(&self) -> Option<TileType> {
-        use TileType::*;
-        match self.tile_id {
-             0| 1| 2| 5|10|11|14                   => Some(Water),
-             3| 4| 6| 7| 8| 9|15|16|17|18|21|26|30 => Some(Field),
-            19|20|22|23|24|25|31                   => Some(Mountain),
-            _                                      => None,
-        }
-    }
-    pub fn bottom_left_type(&self) -> Option<TileType> {
-        use TileType::*;
-        match self.tile_id {
-             0| 3| 4| 5| 7| 8|11                   => Some(Water),
-             1| 2| 6| 9|10|14|15|16|19|20|21|23|24 => Some(Field),
-            17|18|22|25|26|30|31                   => Some(Mountain),
-            _                                      => None,
-        }
-    }
-    
-    pub fn bottom_right_type(&self) -> Option<TileType> {
-        use TileType::*;
-        match self.tile_id {
-             2| 3| 4| 5| 6|10|11                   => Some(Water),
-             0| 1| 2| 8| 9|14|15|18|19|20|21|22|26 => Some(Field),
-            16|17|23|24|25|30|31                   => Some(Mountain),
-            _                                      => None,
-        }
-    }
 }
 
 #[derive(Deserialize, Asset, TypePath)]
@@ -145,71 +66,67 @@ pub struct TileAssets {
     texture_atlas: Handle<TextureAtlas>,
 }
 
-pub fn get_tile_at_pos(pos: Vec2, map_data: &Res<MapData>, tiles: &Query<&GameTile>) -> Option<(usize, usize, GameTile)> {
-    let pos = pos.round();
-    if pos.x < -0.5 {return None}
-    let x = pos.x as usize;
-    if pos.y < -0.5 {return None}
-    let y = pos.y as usize;
-    let entity = map_data.0.get(x, y)?.as_ref()?;
-    Some((x, y, *tiles.get_component::<GameTile>(*entity).ok()?))
+fn single_collision(pos: Vec3, player_transform: &Transform) -> bool{
+    collide_aabb::collide(
+        pos,
+        Vec2::new(0.5, 0.5),
+        player_transform.translation,
+        player_transform.scale.truncate() * 32.0
+    ).is_some()
 }
 
-fn handel_collision(tile: Option<TileType>, pos: Vec3, player_transform: &Transform) -> Option<()>{
-    tile?;
-    if collide_aabb::collide(
-            pos,
-            Vec2::new(0.5, 0.5),
-            player_transform.translation,
-            player_transform.scale.truncate() * 32.0
-    ).is_some() {
-        println!("{pos:?} collided {tile:?}");
-    } else {
-        println!("{pos:?} not collided");
-    }
-    Some(())
-}
+pub fn check_collision(
+    map_data: &MapData,
+    tiles: &Query<&GameTile>,
+    player_transform: &Transform,
+) -> bool {
 
-fn test(
-    map_data: Res<MapData>,
-    tiles: Query<&GameTile>,
-    mut players: Query<(&mut Player, &Transform)>,
-) {
-
-    let (_, player_transform) = players.iter().next().expect("no player found");
     let player_pos = player_transform.translation;
+    
     for x_offset in -1..=1 {
-        for y_offset in -1..1 {
-            let Some((x, y, tile)) = get_tile_at_pos(
-                    Vec2::new(player_pos.x + x_offset as f32, player_pos.y + y_offset as f32),
-                     &map_data, &tiles) else {
-                //warn!("Couldn't get tile");
-                continue;
+        for y_offset in -1..=1 {
+            let Some((x, y, tile)) = map_data.get_tile_at_pos(
+                Vec2::new(player_pos.x + x_offset as f32, player_pos.y + y_offset as f32), &tiles) 
+             else {
+                warn!("Couldn't get tile");
+                return true;
             };
             let x = x as f32;
             let y = y  as f32;
-            handel_collision(
-                tile.top_left_type(),
+            
+            if tile.top_left_type().map(TileType::can_enter).unwrap_or(true).not() && single_collision(
                 Vec3{x: x-0.25, y: y+0.25, z: 1.},
                 player_transform,
-            );
-            handel_collision(
-                tile.top_right_type(),
+            ) {
+                return true;
+            }
+            
+                        
+            if tile.top_right_type().map(TileType::can_enter).unwrap_or(true).not() && single_collision(
                 Vec3{x: x+0.25, y: y+0.25, z: 1.},
                 player_transform,
-            );
-            handel_collision(
-                tile.bottom_left_type(),
+            ) {
+                return true;
+            }
+            
+                        
+            if tile.bottom_left_type().map(TileType::can_enter).unwrap_or(true).not() && single_collision(
                 Vec3{x: x-0.25, y: y-0.25, z: 1.},
                 player_transform,
-            );
-            handel_collision(
-                tile.bottom_right_type(),
+            ) {
+                return true;
+            }
+            
+                        
+            if tile.bottom_right_type().map(TileType::can_enter).unwrap_or(true).not() && single_collision(
                 Vec3{x: x+0.25, y: y-0.25, z: 1.},
                 player_transform,
-            );
+            ) {
+                return true;
+            }
         }
-    }
+    };
+    false
 }
 
 fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
@@ -285,6 +202,9 @@ fn generate_on_load_complete(
             }
 
             // TODO: call let map_data = david(tiles)
+            #[cfg(debug_assertions)]
+            let map = tiles.clone();
+            #[cfg(not(debug_assertions))]
             let map = create_map(
                 tiles.clone(),
                 64,
