@@ -2,7 +2,7 @@ use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
 use crate::{
     player::{Inventory, Player},
-    tile_world::{create_bundle_for_tile, ObjectType, GameObject, TileAssets},
+    tile_world::TileAssets,
     progress::{self, BuildProgress},
     game_tile::{GameTile, TileType, MapData},
 };

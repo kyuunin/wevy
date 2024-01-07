@@ -2,20 +2,21 @@ use bevy::{prelude::*, asset::LoadState};
 use bevy_common_assets::json::JsonAssetPlugin;
 use std::ops::Not;
 use serde::Deserialize;
-use std::{cmp::{min, max}, collections::{HashMap, HashSet}, ops::Deref};
+use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
 use rand::prelude::*;
-
 use bevy::sprite::collide_aabb;
 
 use crate::{
     multi_vec::MultiVec,
-    player::Player,
     game_tile::{
         MapData,
         GameTile,
         TileType,
-    }
+    },
+    game_object::{GameObject},
 };
+#[cfg(not(debug_assertions))]
+use crate::wave_function_collapse_generator::{self, create_map};
 
 pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
@@ -29,44 +30,6 @@ impl Plugin for TileWorldPlugin {
     }
     fn name(&self) -> &str { "TileWorldPlugin" }
 }
-
-
-#[derive(Debug, Copy, Clone)]
-pub enum ObjectType {
-    Tree, Ship, Stone, Campfire
-}
-
-impl From<ObjectType> for GameObject {
-    fn from(object_type: ObjectType) -> Self {
-        use ObjectType::*;
-        match object_type {
-            Tree => GameObject { tile_id: 12 },
-            Ship => GameObject { tile_id: 13 },
-            Stone => GameObject { tile_id: 27 },
-            Campfire => GameObject { tile_id: 29 },
-        }
-    }
-}
-
-#[derive(Component, Debug, Reflect, Copy, Clone)]
-pub struct GameObject {
-    pub tile_id: i32,
-}
-
-
-impl GameObject {
-    pub fn get_type(&self) -> Option<ObjectType> {
-        use ObjectType::*;
-        match self.tile_id {
-            12 => Some(Tree),
-            13 => Some(Ship),
-            27 => Some(Stone),
-            29 => Some(Campfire),
-            _  => None,
-        }
-    }
-}
-
 
 #[derive(Deserialize, Asset, TypePath)]
 struct PyxelFile {
@@ -215,8 +178,8 @@ fn generate_on_load_complete(
                 println!("layer {:?}: {:?}", layer.number, layer.name);
             }
 
-            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
-            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 0).unwrap();
+            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 2).unwrap();
+            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
 
             let min_tile = base_layer.tiles.iter()
                 .filter(|tile| tile.tile != -1)
@@ -239,12 +202,29 @@ fn generate_on_load_complete(
             }
 
             // TODO: call let map_data = david(tiles)
+            #[cfg(debug_assertions)]
             let map = tiles.clone();
+            #[cfg(not(debug_assertions))]
+            let map = create_map(
+                tiles.clone(),
+                64,
+                2,
+                666
+            );
 
-            for y in min_tile.1..=max_tile.1 {
-                for x in min_tile.0..=max_tile.0 {
-                    let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
-                    print!("{:2} ", tile);
+            // for y in min_tile.1..=max_tile.1 {
+            //     for x in min_tile.0..=max_tile.0 {
+            //         let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
+            //         print!("{:2} ", tile);
+            //     }
+            //     println!();
+            // }
+
+            for y in 0..map.h
+            {
+                for x in 0..map.w
+                {
+                    print!("{:2}", map.get(x, y).unwrap());
                 }
                 println!();
             }

@@ -3,8 +3,8 @@ use bevy::{prelude::*, sprite::MaterialMesh2dBundle};
 use crate::{
     player::{Player, Inventory}, 
     crafting::Buildable, 
-    tile_world::{GameObject, create_bundle_for_tile, TileAssets, ObjectType},
-    game_tile::{TileType},
+    tile_world::{create_bundle_for_tile, TileAssets},
+    game_object::{ObjectType, GameObject},
 };
 
 #[derive(Component)]

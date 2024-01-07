@@ -3,11 +3,9 @@ use derive_more::{Add, Sub, AddAssign, SubAssign};
 use std::ops::Not;
 use bevy::prelude::*;
 use crate::{
-    multi_vec::MultiVec,
     game_tile::{
         MapData,
         GameTile,
-        TileType,
     },
     tile_world::check_collision,
 };
@@ -173,7 +171,6 @@ fn keyboard_events(
         transform.translation.x += speed * time.delta_seconds();
         indices.mirrored = false;
         if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
-            transform = *player_transform;
         } else {
             *player_transform = transform;
             indices.walking = true;
