@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::{collections::{HashMap, HashSet, VecDeque}, thread::current};
 
 use bevy::log::info;
 use enum_iterator::{Sequence, all};
@@ -110,46 +110,27 @@ impl Possibilities
 
 struct RulesChecker
 {
-    rules: HashMap<usize, HashMap<Direction, Vec<usize>>>,
+    rules: HashSet<(usize, Direction, usize)>,
 }
 
 impl RulesChecker
 {
     pub fn new(patterns: &Vec<Pattern>) -> Self
     {
-        let mut empty_rules = HashMap::<usize, HashMap<Direction, Vec<usize>>>::new();
-
-        for pattern_index in 0..patterns.len()
-        {
-            empty_rules.insert(pattern_index, HashMap::new());
-
-            let possible_patterns = empty_rules.get_mut(&pattern_index).expect("Alles ist kaputt :(");
-            for direction in all::<Direction>()
-            {
-                possible_patterns.insert(direction, Vec::new());
-            }
-        }
-
         Self
         {
-            rules: empty_rules,
+            rules: HashSet::new(),
         }
     }
 
     pub fn add_rule(&mut self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize)
     {
-        let possible_patterns = self.rules
-            .get_mut(&current_pattern_index)
-            .expect("Rules ist nicht mit allen Patterns gefüllt")
-            .get_mut(&direction)
-            .expect("Rules ist nicht komplett mit Directions gefüllt");
-
-        possible_patterns.push(next_pattern_index);
+        self.rules.insert((current_pattern_index, direction, next_pattern_index));
     }
 
     pub fn check_if_pattern_is_allowed(&self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize) -> bool
     {
-        self.rules[&current_pattern_index][&direction].contains(&next_pattern_index)
+        self.rules.contains(&(current_pattern_index, direction, next_pattern_index))
     }
 }
 
