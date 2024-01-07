@@ -431,6 +431,8 @@ fn propagate_chosen_possibility(
     work_queue.push_back((x_chosen_tile, y_chosen_tile));
     already_handled.insert((x_chosen_tile, y_chosen_tile));
 
+    let mut recompute_entropy_set = HashSet::<(usize, usize)>::new();
+
     while let Some((x_current_tile, y_current_tile)) = work_queue.pop_front() 
     {
         let possible_current_patterns = possibilites_for_tiles.get(x_current_tile, y_current_tile).unwrap().clone();
@@ -478,18 +480,23 @@ fn propagate_chosen_possibility(
 
             if has_changed && !already_handled.contains(&(next_x, next_y))
             {
-                *entropy_per_tile.get_mut(next_x, next_y).unwrap() = get_shannon_entropy_for_tile(
-                    next_x,
-                    next_y,
-                    possibilites_for_tiles.get(next_x, next_y).unwrap(),
-                    &patterns,
-                    random_number_generator,
-                );
+                recompute_entropy_set.insert((next_x, next_y));
 
                 work_queue.push_back((next_x, next_y));
                 already_handled.insert((next_x, next_y));
             }
         }
+    }
+
+    for (x, y) in recompute_entropy_set
+    {
+        *entropy_per_tile.get_mut(x, y).unwrap() = get_shannon_entropy_for_tile(
+            x,
+            y,
+            possibilites_for_tiles.get(x, y).unwrap(),
+            &patterns,
+            random_number_generator,
+        );
     }
 }
 
