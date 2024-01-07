@@ -13,7 +13,7 @@ use crate::{
         GameTile,
         TileType,
     },
-    game_object::{GameObject},
+    game_object::{GameObject}, player::Player,
 };
 #[cfg(not(debug_assertions))]
 use crate::wave_function_collapse_generator::{self, create_map};
@@ -161,6 +161,7 @@ fn generate_on_load_complete(
     mut map_data: ResMut<MapData>,
     pyxel_file_assets: Res<Assets<PyxelFile>>,
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
+    mut player_query: Query<(&Player, &mut Transform)>,
 ) {
     if tile_assets.has_generated {
         return;
@@ -201,6 +202,7 @@ fn generate_on_load_complete(
                 }
             }
 
+            
             // TODO: call let map_data = david(tiles)
             #[cfg(debug_assertions)]
             let map = tiles.clone();
@@ -211,6 +213,8 @@ fn generate_on_load_complete(
                 2,
                 666
             );
+
+            let map_size = map.w; // assume square map
 
             // for y in min_tile.1..=max_tile.1 {
             //     for x in min_tile.0..=max_tile.0 {
@@ -236,10 +240,18 @@ fn generate_on_load_complete(
             let texture_atlas_handle = texture_atlases.add(texture_atlas);
             tile_assets.texture_atlas = texture_atlas_handle;
             
+            let mut any_player_spawn = None;
+
             *map_data.as_mut() = MapData(MultiVec::new(None, map.w, map.h));
             for y in 0..map.h {
                 for x in 0..map.w {
                     let tile = map.get(x, y).unwrap();
+                    let sqr = |x| {x * x};
+                    let lensqr = |x, y| {sqr(x) + sqr(y)};
+                    let distsqr = |x, y| { lensqr(x - map_size / 2, y - map_size / 2)};
+                    if *tile == 9 && any_player_spawn.map(|(last_x,last_y)| distsqr(last_x, last_y) > distsqr(x, y)).unwrap_or(true) {
+                        any_player_spawn = Some((x, y));
+                    }
                     if *tile != -1 {
                         let id = commands.spawn((
                             create_bundle_for_tile(x, y, *tile, -1.0, &*tile_assets),
@@ -274,6 +286,13 @@ fn generate_on_load_complete(
                             ));
                         }
                     }
+                }
+            }
+
+            // Move player to spawn point
+            if let Some((x, y)) = any_player_spawn {
+                for (player, mut transform) in player_query.iter_mut() {
+                    transform.translation = Vec3::new(x as f32, y as f32, 0.0);
                 }
             }
 
