@@ -5,7 +5,7 @@ use bevy::sprite::collide_aabb;
 
 use crate::player::Player;
 use crate::progress::{self, DestroyProgress};
-use crate::tile_world::{GameObject, ObjectType};
+use crate::game_object::{GameObject, ObjectType};
 
 pub struct ObjectInteractionPlugin;
 
