@@ -125,16 +125,24 @@ impl RulesChecker
 
     pub fn add_rule(&mut self, current_pattern_index: usize, direction: Direction, next_pattern_index: usize)
     {
+        // if we insert one direction, insert all directions that are not inserted yet
         if !self.rules.contains_key(&(current_pattern_index, direction))
         {
-            self.rules.insert((current_pattern_index, direction), BitSet::new());
+            for direction in all::<Direction>()
+            {
+                if !self.rules.contains_key(&(current_pattern_index, direction))
+                {
+                    self.rules.insert((current_pattern_index, direction), BitSet::new());
+                }
+            }
         }
+
         self.rules.get_mut(&(current_pattern_index, direction)).unwrap().insert(next_pattern_index);
     }
 
     pub fn get_possible_patterns(&self, current_pattern_index: usize, direction: Direction) -> &BitSet
     {
-        self.rules.get(&(current_pattern_index, direction)).unwrap()
+        self.rules.get(&(current_pattern_index, direction)).expect("No rule for this pattern and direction!")
     }
 }
 
@@ -412,6 +420,7 @@ fn propagate_chosen_possibility(
     println!("we are starting propagation. Behold the mysteries of the universe!");
     plot_possibilities(possibilites_for_tiles);
 
+    let mut has_valid_current_pattern = BitSet::new();
     
     work_queue.push_back((x_chosen_tile, y_chosen_tile));
     already_handled.insert((x_chosen_tile, y_chosen_tile));
@@ -433,7 +442,7 @@ fn propagate_chosen_possibility(
 
             let before_len = possible_next_patterns.len();
 
-            let mut has_valid_current_pattern = BitSet::new();
+            has_valid_current_pattern.clear();
             for current_pattern_index in possible_current_patterns.iter()
             {
                 has_valid_current_pattern.union_with(rules_checker.get_possible_patterns(current_pattern_index, direction));
