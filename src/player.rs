@@ -23,7 +23,28 @@ impl Plugin for PlayerPlugin {
 #[derive(Component)]
 pub struct Player {
     pub inventory: Inventory,
+    #[cfg(feature = "cheat")]
     pub ghost: bool,
+}
+
+impl Player {
+    fn new() -> Self {
+        #[cfg(feature = "cheat")]
+        return Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 }, ghost: false, };
+        #[cfg(not(feature = "cheat"))]
+        return Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 },};
+    }
+    fn check_collision(
+        &self, 
+        map_data: &MapData,
+        tiles: &Query<&GameTile>,
+        player_transform: &Transform,
+    ) -> bool {
+        #[cfg(feature = "cheat")]
+        return self.ghost.not() && check_collision(&map_data, &tiles, &player_transform);
+        #[cfg(not(feature = "cheat"))]
+        return check_collision(&map_data, &tiles, &player_transform);
+    }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Add, Sub, AddAssign, SubAssign)]
@@ -117,7 +138,7 @@ fn setup(
         },
         animation_indices,
         AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
-        Player { inventory: Inventory { wood: 0, stone: 0, weapons: 0 }, ghost: false, },
+        Player::new(),
         Name::new("Player"),
         
     )).id();
@@ -141,7 +162,7 @@ fn keyboard_events(
     indices.walking = false;
     if input.pressed(KeyCode::W) {
         transform.translation.y += speed * time.delta_seconds();
-        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+        if player.check_collision(&map_data, &tiles, &transform){
             transform = *player_transform;
         } else {
             *player_transform = transform;
@@ -150,7 +171,7 @@ fn keyboard_events(
     }
     if input.pressed(KeyCode::S) {
         transform.translation.y -= speed * time.delta_seconds();
-        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+        if player.check_collision(&map_data, &tiles, &transform){
             transform = *player_transform;
         } else {
             *player_transform = transform;
@@ -160,7 +181,7 @@ fn keyboard_events(
     if input.pressed(KeyCode::A) {
         transform.translation.x -= speed * time.delta_seconds();
         indices.mirrored = true;
-        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+        if player.check_collision(&map_data, &tiles, &transform){
             transform = *player_transform;
         } else {
             *player_transform = transform;
@@ -170,15 +191,17 @@ fn keyboard_events(
     if input.pressed(KeyCode::D) {
         transform.translation.x += speed * time.delta_seconds();
         indices.mirrored = false;
-        if player.ghost.not() && check_collision(&map_data, &tiles, &transform){
+        if player.check_collision(&map_data, &tiles, &transform){
         } else {
             *player_transform = transform;
             indices.walking = true;
         }
     }
+    #[cfg(feature = "cheat")]
     if input.pressed(KeyCode::X) {
         player.ghost = true;
     }
+    #[cfg(feature = "cheat")]
     if input.pressed(KeyCode::Y) {
         player.ghost = false;
     }

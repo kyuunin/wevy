@@ -5,7 +5,7 @@ mod game_tile;
 mod game_object;
 
 use bevy::prelude::*;
-#[cfg(debug_assertions)]
+#[cfg(feature = "inspect")]
 use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use crafting::CraftingPlugin;
 use progress::ProgressPlugin;
@@ -15,6 +15,7 @@ use crate::tile_world::TileWorldPlugin;
 
 mod tile_world;
 mod multi_vec;
+#[cfg(feature = "wave_function")]
 mod wave_function_collapse_generator;
 mod object_interaction;
 mod progress;
@@ -30,7 +31,7 @@ fn main() {
         .add_plugins(ProgressPlugin)
         .add_plugins(CraftingPlugin)
         .add_plugins(object_interaction::ObjectInteractionPlugin);
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "inspect")]
     let builder = builder.add_plugins(WorldInspectorPlugin::new());
     builder.run();
 }

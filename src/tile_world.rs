@@ -15,7 +15,7 @@ use crate::{
     },
     game_object::{GameObject}, player::Player,
 };
-#[cfg(not(debug_assertions))]
+#[cfg(feature = "wave_function")]
 use crate::wave_function_collapse_generator::{self, create_map};
 
 pub struct TileWorldPlugin;
@@ -204,9 +204,9 @@ fn generate_on_load_complete(
 
             
             // TODO: call let map_data = david(tiles)
-            #[cfg(debug_assertions)]
+            #[cfg(not(feature = "wave_function"))]
             let map = tiles.clone();
-            #[cfg(not(debug_assertions))]
+            #[cfg(feature = "wave_function")]
             let map = create_map(
                 tiles.clone(),
                 64,
@@ -291,7 +291,7 @@ fn generate_on_load_complete(
 
             // Move player to spawn point
             if let Some((x, y)) = any_player_spawn {
-                for (player, mut transform) in player_query.iter_mut() {
+                for (_player, mut transform) in player_query.iter_mut() {
                     transform.translation = Vec3::new(x as f32, y as f32, 0.0);
                 }
             }

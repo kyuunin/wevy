@@ -90,7 +90,7 @@ fn update(
     mut players: Query<(&mut Player, &Transform)>,
     map_data: Res<MapData>,
     tiles: Query<&GameTile>,
-    tile_assets: Res<TileAssets>,
+    _tile_assets: Res<TileAssets>,
     progress_stuff: Res<progress::ProgressStuff>,
     time: Res<Time>,
 ) {
@@ -100,7 +100,7 @@ fn update(
     let key_evr = key_evr.read().collect::<Vec<_>>();
 
     // Cheats: Number keys add resources
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "cheat")]
     {
         let (mut player, _) = players.iter_mut().next().expect("no player found");
         if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::Key1)) {
@@ -130,7 +130,7 @@ fn update(
         let Inventory { wood: wood_price, stone: stone_price, weapons: weapons_price } = price;
         if player.inventory.wood >= wood_price && player.inventory.stone >= stone_price && player.inventory.weapons >= weapons_price {
             let (x, y, tile) = map_data.get_tile_at_pos(transform.translation.truncate(), &tiles).expect("no tile found");
-            let has_water = tile.bottom_left_type() == Some(TileType::Water)
+            let _has_water = tile.bottom_left_type() == Some(TileType::Water)
                 || tile.bottom_right_type() == Some(TileType::Water)
                 || tile.top_left_type() == Some(TileType::Water)
                 || tile.top_right_type() == Some(TileType::Water);
