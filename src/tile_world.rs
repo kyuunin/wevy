@@ -1,10 +1,9 @@
-use bevy::{prelude::*, asset::LoadState};
+use std::{sync::{Mutex, mpsc}, collections::{HashMap, HashSet}, cmp::{min, max}, ops::Not};
+
+use bevy::{prelude::*, asset::LoadState, sprite::collide_aabb};
 use bevy_common_assets::json::JsonAssetPlugin;
-use std::ops::Not;
-use serde::Deserialize;
-use std::{cmp::{min, max}, collections::{HashMap, HashSet}};
 use rand::prelude::*;
-use bevy::sprite::collide_aabb;
+use serde::Deserialize;
 
 use crate::{
     multi_vec::MultiVec,
@@ -13,10 +12,8 @@ use crate::{
         GameTile,
         TileType,
     },
-    game_object::{GameObject}, player::Player,
+    game_object::GameObject, player::Player, wave_function_collapse_generator::WaveFunctionCollapseGenerator,
 };
-#[cfg(feature = "wave_function")]
-use crate::wave_function_collapse_generator::{self, create_map};
 
 pub struct TileWorldPlugin;
 impl Plugin for TileWorldPlugin {
@@ -62,8 +59,11 @@ struct PyxelTile {
 pub struct TileAssets {
     pyxel_file: Handle<PyxelFile>,
     tileset: Handle<Image>,
-    has_generated: bool,
+    generation_started: bool,
+    has_moved_player: bool,
+    rx: Option<Mutex<mpsc::Receiver<(usize, usize, i32)>>>,
     texture_atlas: Handle<TextureAtlas>,
+    spawn_entities_for_base_tile: HashMap<i32, HashSet<i32>>,
 }
 
 fn single_collision(pos: Vec3, player_transform: &Transform) -> bool{
@@ -88,7 +88,7 @@ pub fn check_collision(
             let Some((x, y, tile)) = map_data.get_tile_at_pos(
                 Vec2::new(player_pos.x + x_offset as f32, player_pos.y + y_offset as f32), &tiles) 
              else {
-                warn!("Couldn't get tile");
+                warn!("Couldn't get tile {} {}", (player_pos.x + x_offset as f32).round(), (player_pos.y + y_offset as f32).round());
                 return true;
             };
             let x = x as f32;
@@ -136,8 +136,11 @@ fn pre_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.insert_resource(TileAssets {
         pyxel_file: pyxel_handle,
         tileset: tileset_handle,
-        has_generated: false,
+        generation_started: false,
         texture_atlas: default(),
+        has_moved_player: false,
+        rx: None,
+        spawn_entities_for_base_tile: HashMap::new(),
     });
 }
 
@@ -163,143 +166,164 @@ fn generate_on_load_complete(
     mut texture_atlases: ResMut<Assets<TextureAtlas>>,
     mut player_query: Query<(&Player, &mut Transform)>,
 ) {
-    if tile_assets.has_generated {
-        return;
-    }
+    if !tile_assets.generation_started {
+        let pyxel_load_state = asset_server.get_load_state(tile_assets.pyxel_file.id())
+            .expect("asset_server.get_load_state returns Option<LoadState>, should be Some");
 
-    match asset_server.get_load_state(tile_assets.pyxel_file.id()).expect(
-        "asset_server.get_load_state returns Option<LoadState>, should be Some") {
-        LoadState::Loaded => {
+        if pyxel_load_state == LoadState::Loaded {
             println!("pyxel file loaded!!!!!!11");
+
             let pyxel_file = pyxel_file_assets.get(&tile_assets.pyxel_file).expect(
                 "pyxel json file should be loaded since we checked that LoadState::Loaded"
             );
+            start_generation(pyxel_file, &mut *tile_assets, &mut *texture_atlases, &mut *map_data);
 
-            for layer in pyxel_file.layers.iter() {
-                println!("layer {:?}: {:?}", layer.number, layer.name);
-            }
+            tile_assets.generation_started = true;
+        }
 
-            let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 2).unwrap();
-            let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
+    }
 
-            let min_tile = base_layer.tiles.iter()
-                .filter(|tile| tile.tile != -1)
-                .map(|tile| (tile.x, tile.y))
-                .fold((i32::MAX, i32::MAX), |(min_x, min_y), (x, y)| (min(min_x, x), min(min_y, y)));
-            let max_tile = base_layer.tiles.iter()
-                .filter(|tile| tile.tile != -1)
-                .map(|tile| (tile.x, tile.y))
-                .fold((i32::MIN, i32::MIN), |(max_x, max_y), (x, y)| (max(max_x, x), max(max_y, y)));
-            println!("min_tile: {:?}, max_tile: {:?}", min_tile, max_tile);
+    spawn_generated(&mut commands, &mut *tile_assets, &mut player_query.single_mut().1, &mut *map_data);
+}
 
-            let mut tiles = MultiVec::new(-1, (max_tile.0 - min_tile.0 + 1) as usize, (max_tile.1 - min_tile.1 + 1) as usize);
-            for tile in base_layer.tiles.iter() {
-                if tile.tile != -1 {
-                    let x = (tile.x - min_tile.0) as usize;
-                    let y = (tile.y - min_tile.1) as usize;
-                    let flipped_y = (max_tile.1 - min_tile.1) as usize - y;
-                    *(tiles.get_mut(x, flipped_y).unwrap()) = tile.tile;
-                }
-            }
+fn start_generation(
+    pyxel_file: &PyxelFile,
+    tile_assets: &mut TileAssets,
+    texture_atlases: &mut Assets<TextureAtlas>,
+    map_data: &mut MapData,
+) {
+    for layer in pyxel_file.layers.iter() {
+        println!("layer {:?}: {:?}", layer.number, layer.name);
+    }
 
-            
-            // TODO: call let map_data = david(tiles)
-            #[cfg(not(feature = "wave_function"))]
-            let map = tiles.clone();
-            #[cfg(feature = "wave_function")]
-            let map = create_map(
-                tiles.clone(),
-                64,
-                2,
-                666
-            );
+    let base_layer = pyxel_file.layers.iter().find(|layer| layer.number == 2).unwrap();
+    let entity_layer = pyxel_file.layers.iter().find(|layer| layer.number == 1).unwrap();
 
-            let map_size = map.w; // assume square map
+    let min_tile = base_layer.tiles.iter()
+        .filter(|tile| tile.tile != -1)
+        .map(|tile| (tile.x, tile.y))
+        .fold((i32::MAX, i32::MAX), |(min_x, min_y), (x, y)| (min(min_x, x), min(min_y, y)));
+    let max_tile = base_layer.tiles.iter()
+        .filter(|tile| tile.tile != -1)
+        .map(|tile| (tile.x, tile.y))
+        .fold((i32::MIN, i32::MIN), |(max_x, max_y), (x, y)| (max(max_x, x), max(max_y, y)));
+    println!("min_tile: {:?}, max_tile: {:?}", min_tile, max_tile);
 
-            // for y in min_tile.1..=max_tile.1 {
-            //     for x in min_tile.0..=max_tile.0 {
-            //         let tile = tiles.get((x - min_tile.0) as usize, (y - min_tile.1) as usize).unwrap();
-            //         print!("{:2} ", tile);
-            //     }
-            //     println!();
-            // }
+    let mut tiles = MultiVec::new(-1, (max_tile.0 - min_tile.0 + 1) as usize, (max_tile.1 - min_tile.1 + 1) as usize);
+    for tile in base_layer.tiles.iter() {
+        if tile.tile != -1 {
+            let x = (tile.x - min_tile.0) as usize;
+            let y = (tile.y - min_tile.1) as usize;
+            let flipped_y = (max_tile.1 - min_tile.1) as usize - y;
+            *(tiles.get_mut(x, flipped_y).unwrap()) = tile.tile;
+        }
+    }
 
-            for y in 0..map.h
+    // for each entity tile type, spawn on base layer tiles
+    tile_assets.spawn_entities_for_base_tile = HashMap::<i32, HashSet<i32>>::new();
+    for entity_tile in entity_layer.tiles.iter().filter(|tile| tile.tile != -1) {
+        let base_tile = base_layer.tiles.iter()
+            .find(|tile| tile.x == entity_tile.x && tile.y == entity_tile.y).unwrap();
+        tile_assets.spawn_entities_for_base_tile.entry(base_tile.tile).or_insert(default()).insert(entity_tile.tile);
+    }
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    tile_assets.rx = Some(Mutex::new(rx));
+
+    let map_size = 64;
+
+    std::thread::spawn(move || {
+        
+        let generator = WaveFunctionCollapseGenerator::new(
+            tiles,
+            map_size,
+            2,
+            666
+        );
+
+        #[cfg(debug_assertions)]
+        let mut map = MultiVec::new(-1, map_size, map_size);
+
+        for (x, y, tile_id) in generator {
+            tx.send((x, y, tile_id)).unwrap();
+
+            #[cfg(debug_assertions)]
             {
-                for x in 0..map.w
-                {
-                    print!("{:2}", map.get(x, y).unwrap());
-                }
-                println!();
+                *map.get_mut(x, y).unwrap() = tile_id;
             }
-
-            let texture_atlas = TextureAtlas::from_grid(
-                tile_assets.tileset.clone(),
-                Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.tileheight as f32),
-                8, 8, None, None);
-            let texture_atlas_handle = texture_atlases.add(texture_atlas);
-            tile_assets.texture_atlas = texture_atlas_handle;
-            
-            let mut any_player_spawn = None;
-
-            *map_data.as_mut() = MapData(MultiVec::new(None, map.w, map.h));
-            for y in 0..map.h {
-                for x in 0..map.w {
-                    let tile = map.get(x, y).unwrap();
-                    let sqr = |x| {x * x};
-                    let lensqr = |x, y| {sqr(x) + sqr(y)};
-                    let distsqr = |x, y| { lensqr(x - map_size / 2, y - map_size / 2)};
-                    if *tile == 9 && any_player_spawn.map(|(last_x,last_y)| distsqr(last_x, last_y) > distsqr(x, y)).unwrap_or(true) {
-                        any_player_spawn = Some((x, y));
-                    }
-                    if *tile != -1 {
-                        let id = commands.spawn((
-                            create_bundle_for_tile(x, y, *tile, -1.0, &*tile_assets),
-                            GameTile { tile_id: *tile },
-                            Name::new(format!("Tile {tile} ({x},{y})")),
-                        )).id();
-                        *map_data.as_mut().0.get_mut(x, y).expect("Storing map data failed") = Some(id);
-                    }
-                }
+        }
+        
+        #[cfg(debug_assertions)]
+        for y in 0..map.h {
+            for x in 0..map.w {
+                print!("{:2}", map.get(x, y).unwrap());
             }
+            println!();
+        }
+    });
 
-            // for each entity tile type, spawn on base layer tiles
-            let mut spawn_entities_for_base_tile = HashMap::<i32, HashSet<i32>>::new();
-            for entity_tile in entity_layer.tiles.iter().filter(|tile| tile.tile != -1) {
-                let base_tile = base_layer.tiles.iter()
-                    .find(|tile| tile.x == entity_tile.x && tile.y == entity_tile.y).unwrap();
-                spawn_entities_for_base_tile.entry(base_tile.tile).or_insert(default()).insert(entity_tile.tile);
+    let texture_atlas = TextureAtlas::from_grid(
+        tile_assets.tileset.clone(),
+        Vec2::new(pyxel_file.tilewidth as f32, pyxel_file.tileheight as f32),
+        8, 8, None, None);
+    let texture_atlas_handle = texture_atlases.add(texture_atlas);
+    tile_assets.texture_atlas = texture_atlas_handle;
+
+    *map_data = MapData { 0: MultiVec::new(None, map_size, map_size) };
+}
+
+fn spawn_generated(
+    commands: &mut Commands,
+    tile_assets: &mut TileAssets,
+    player_transform: &mut Transform,
+    map_data: &mut MapData,
+) {
+    if tile_assets.rx.is_none() {
+        return;
+    }
+
+    let rx = tile_assets.rx.as_ref().unwrap().lock().unwrap();
+    let max_tiles_per_frame = 32;
+    for _ in 0..max_tiles_per_frame {
+        let next = rx.try_recv();
+        if next.is_err() { break; }
+        let (x, y, tile_id) = next.unwrap();
+        
+        debug!("rx received: ({},{}) = {}", x, y, tile_id);
+        
+        if tile_id == -1 {
+            warn!("rx received tile_id == -1");
+            return;
+        }
+
+        let base_entity = commands.spawn((
+            create_bundle_for_tile(x, y, tile_id, -1.0, &*tile_assets),
+            GameTile { tile_id },
+            Name::new(format!("Tile {tile_id} ({x},{y})")),
+        )).id();
+
+        let map_data_cell = map_data.0.get_mut(x, y).expect("accessing map data failed");
+        assert!(map_data_cell.is_none(), "map data cell should be None");
+        *map_data_cell = Some(base_entity);
+
+        // Generate entities on correct base tiles
+        let spawn_rate = 0.2 as f32;
+
+        if let Some(entities) = tile_assets.spawn_entities_for_base_tile.get(&tile_id) {
+            if rand::random::<f32>() < spawn_rate {
+                let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
+                commands.spawn((
+                    create_bundle_for_tile(x, y, *entity, -0.5, &*tile_assets),
+                    GameObject { tile_id: *entity },
+                    Name::new(format!("Object {entity} ({x},{y})")),
+                ));
             }
+        }
 
-            // Generate entities on correct base tiles
-            let spawn_rate = 0.2 as f32;
-            for y in 0..map.h {
-                for x in 0..map.w {
-                    let base_tile = map.get(x, y).unwrap();
-                    if let Some(entities) = spawn_entities_for_base_tile.get(base_tile)  {
-                        if rand::random::<f32>() < spawn_rate {
-                            let entity = entities.iter().choose(&mut rand::thread_rng()).expect("should have at least one entity");
-                            commands.spawn((
-                                create_bundle_for_tile(x, y, *entity, -0.5, &*tile_assets),
-                                GameObject { tile_id: *entity },
-                                Name::new(format!("Object {entity} ({x},{y})")),
-                            ));
-                        }
-                    }
-                }
-            }
-
-            // Move player to spawn point
-            if let Some((x, y)) = any_player_spawn {
-                for (_player, mut transform) in player_query.iter_mut() {
-                    transform.translation = Vec3::new(x as f32, y as f32, 0.0);
-                }
-            }
-
-            tile_assets.has_generated = true;
-        },
-        _ => {
-            println!("pyxel file not loaded yet");
+        let player_spawn_tile = 9;
+        if !tile_assets.has_moved_player && tile_id == player_spawn_tile {
+            player_transform.translation = Vec3::new(x as f32, y as f32, player_transform.translation.z);
+            tile_assets.has_moved_player = true;
         }
     }
 }

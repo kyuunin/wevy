@@ -2,7 +2,6 @@ use bevy::{prelude::*, input::{keyboard::KeyboardInput, ButtonState}};
 
 use crate::{
     player::{Inventory, Player},
-    tile_world::TileAssets,
     progress::{self, BuildProgress},
     game_tile::{GameTile, TileType, MapData},
 };
@@ -90,7 +89,6 @@ fn update(
     mut players: Query<(&mut Player, &Transform)>,
     map_data: Res<MapData>,
     tiles: Query<&GameTile>,
-    _tile_assets: Res<TileAssets>,
     progress_stuff: Res<progress::ProgressStuff>,
     time: Res<Time>,
 ) {
@@ -125,7 +123,7 @@ fn update(
 
     // [R] to build
     if key_evr.iter().any(|ev| ev.state == ButtonState::Pressed && ev.key_code == Some(KeyCode::R)) {
-        let (mut player, transform) = players.iter_mut().next().expect("no player found");
+        let (player, transform) = players.iter_mut().next().expect("no player found");
         let price = crafting_price(crafting_state.recipe);
         let Inventory { wood: wood_price, stone: stone_price, weapons: weapons_price } = price;
         if player.inventory.wood >= wood_price && player.inventory.stone >= stone_price && player.inventory.weapons >= weapons_price {
